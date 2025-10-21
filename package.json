@@ -1,0 +1,38 @@
+{
+  "name": "screeps-api-mcp",
+  "version": "1.0.0",
+  "description": "Model Context Protocol server for Screeps game API access",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/index.js",
+    "test": "node --test",
+    "setup:claude": "node scripts/setup-claude.js",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "screeps",
+    "mcp",
+    "model-context-protocol",
+    "api",
+    "game"
+  ],
+  "author": "Ralph Schuler",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "ws": "^8.18.0",
+    "node-fetch": "^3.3.2",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/ws": "^8.5.10",
+    "typescript": "^5.0.0"
+  },
+  "bin": {
+    "screeps-api-mcp": "./dist/index.js"
+  }
+}
