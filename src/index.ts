@@ -9,12 +9,14 @@ import {
   McpError
 } from '@modelcontextprotocol/sdk/types.js';
 import { ScreepsTools } from './tools.js';
+import { Command } from 'commander';
+import { ConnectionConfig } from './types.js';
 
 class ScreepsMCPServer {
   private server: Server;
   private tools: ScreepsTools;
 
-  constructor() {
+  constructor(connectionConfig?: ConnectionConfig) {
     this.server = new Server(
       {
         name: 'screeps-api-mcp',
@@ -27,7 +29,7 @@ class ScreepsMCPServer {
       }
     );
 
-    this.tools = new ScreepsTools();
+    this.tools = new ScreepsTools(connectionConfig);
     this.setupRequestHandlers();
   }
 
@@ -73,8 +75,53 @@ class ScreepsMCPServer {
   }
 }
 
+// Parse command line arguments
+function parseCliArgs(): ConnectionConfig | undefined {
+  const program = new Command();
+  
+  program
+    .name('screeps-api-mcp')
+    .description('Screeps API MCP Server')
+    .version('1.0.0')
+    .option('--token <token>', 'Screeps API token')
+    .option('--username <username>', 'Screeps username')
+    .option('--password <password>', 'Screeps password')
+    .option('--host <host>', 'Screeps server host', 'screeps.com')
+    .option('--secure', 'Use HTTPS/WSS', true)
+    .option('--no-secure', 'Use HTTP/WS')
+    .option('--shard <shard>', 'Default shard', 'shard0')
+    .parse();
+
+  const options = program.opts();
+  
+  // Check for environment variables as fallback
+  const token = options.token || process.env.SCREEPS_TOKEN;
+  const username = options.username || process.env.SCREEPS_USERNAME;
+  const password = options.password || process.env.SCREEPS_PASSWORD;
+  const host = options.host || process.env.SCREEPS_HOST || 'screeps.com';
+  const secure = options.secure !== false && (process.env.SCREEPS_SECURE !== 'false');
+  const shard = options.shard || process.env.SCREEPS_SHARD || 'shard0';
+
+  // Validate authentication parameters
+  if (!token && (!username || !password)) {
+    console.error('Error: Must provide either --token or both --username and --password (or use environment variables)');
+    console.error('Environment variables: SCREEPS_TOKEN, SCREEPS_USERNAME, SCREEPS_PASSWORD, SCREEPS_HOST, SCREEPS_SECURE, SCREEPS_SHARD');
+    process.exit(1);
+  }
+
+  return {
+    host,
+    secure,
+    username,
+    password,
+    token,
+    shard
+  };
+}
+
 // Start the server
-const server = new ScreepsMCPServer();
+const connectionConfig = parseCliArgs();
+const server = new ScreepsMCPServer(connectionConfig);
 server.start().catch((error) => {
   console.error('Failed to start server:', error);
   process.exit(1);

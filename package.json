@@ -23,8 +23,9 @@
   "license": "MIT",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
-    "ws": "^8.18.0",
+    "commander": "^14.0.1",
     "node-fetch": "^3.3.2",
+    "ws": "^8.18.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {
