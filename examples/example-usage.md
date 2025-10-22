@@ -2,46 +2,40 @@
 
 This document provides practical examples of using the Screeps API MCP Server with various MCP clients.
 
-## Basic Connection Examples
+## Starting the Server
 
-### Connecting to Official Servers
+The MCP server must be started with authentication credentials before it can be used.
+
+### Official Servers
 
 #### Main Server (screeps.com)
-```
-Tool: screeps_connect
-Parameters:
-- connectionName: "main"
-- username: "your-username"
-- password: "your-password"
+```bash
+screeps-api-mcp --token your-api-token-here
+# or
+screeps-api-mcp --username your-username --password your-password
 ```
 
 #### PTR Server
-```
-Tool: screeps_connect
-Parameters:
-- connectionName: "ptr"
-- host: "screeps.com/ptr"
-- username: "your-username"
-- password: "your-password"
-```
-
-#### Using API Token (Recommended)
-```
-Tool: screeps_connect
-Parameters:
-- connectionName: "main"
-- token: "your-api-token-from-screeps"
+```bash
+screeps-api-mcp --token your-api-token --host screeps.com/ptr
 ```
 
 ### Private Server Example
+```bash
+screeps-api-mcp --username admin --password server-password --host my-server.example.com:21025 --no-secure
 ```
-Tool: screeps_connect
-Parameters:
-- connectionName: "private"
-- host: "my-server.example.com:21025"
-- secure: false
-- username: "admin"
-- password: "server-password"
+
+### Using Environment Variables
+```bash
+export SCREEPS_TOKEN=your-api-token-here
+screeps-api-mcp
+
+# or for private server
+export SCREEPS_USERNAME=admin
+export SCREEPS_PASSWORD=server-password
+export SCREEPS_HOST=my-server.example.com:21025
+export SCREEPS_SECURE=false
+screeps-api-mcp
 ```
 
 ## Console Command Examples
@@ -150,20 +144,43 @@ Parameters:
 
 ## Multi-Server Workflow
 
-### Setting Up Multiple Connections
-```
-1. Connect to main: screeps_connect with connectionName="main", token="main-token"
-2. Connect to PTR: screeps_connect with connectionName="ptr", host="screeps.com/ptr", token="ptr-token"
-3. Connect to private: screeps_connect with connectionName="private", host="private.server.com", username="user", password="pass"
+### Setting Up Multiple Server Connections
+
+Since the MCP server connects to a single Screeps server per instance, you'll need to run separate MCP server instances for different servers:
+
+#### Terminal/Shell 1 - Main Server
+```bash
+screeps-api-mcp --token your-main-token
 ```
 
-### Compare Servers
+#### Terminal/Shell 2 - PTR Server  
+```bash
+screeps-api-mcp --token your-ptr-token --host screeps.com/ptr
 ```
-1. Check main server: screeps_user_info with connectionName="main"
-2. Check PTR: screeps_user_info with connectionName="ptr"
-3. Execute same command on both:
-   - screeps_console_command with connectionName="main", command="Game.time"
-   - screeps_console_command with connectionName="ptr", command="Game.time"
+
+#### Terminal/Shell 3 - Private Server
+```bash
+screeps-api-mcp --username user --password pass --host private.server.com --no-secure
+```
+
+### MCP Client Configuration for Multiple Servers
+```json
+{
+  "mcpServers": {
+    "screeps-main": {
+      "command": "screeps-api-mcp",
+      "args": ["--token", "your-main-token"]
+    },
+    "screeps-ptr": {
+      "command": "screeps-api-mcp", 
+      "args": ["--token", "your-ptr-token", "--host", "screeps.com/ptr"]
+    },
+    "screeps-private": {
+      "command": "screeps-api-mcp",
+      "args": ["--username", "user", "--password", "pass", "--host", "private.server.com", "--no-secure"]
+    }
+  }
+}
 ```
 
 ## Advanced Examples
@@ -223,7 +240,7 @@ Most tools will return detailed error messages. Common scenarios:
 - Invalid memory segment: "Segment number must be between 0 and 99"
 
 ### Usage Errors
-- Missing connection: "No connection found with name 'xyz'. Please connect first using screeps_connect."
+- Missing connection: "No connection found with name 'xyz'. Server must be started with authentication parameters."
 - Invalid command syntax: "SyntaxError in console command"
 
 ## Tips and Best Practices

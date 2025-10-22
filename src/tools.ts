@@ -4,50 +4,35 @@ import { ConnectionConfig, ConnectionConfigSchema } from './types.js';
 
 export class ScreepsTools {
   private connections = new Map<string, ScreepsAPI>();
+  private defaultConnection?: ScreepsAPI;
+
+  constructor(private connectionConfig?: ConnectionConfig) {
+    // Connection will be initialized when first needed
+  }
+
+  private async initializeDefaultConnection(): Promise<void> {
+    if (!this.connectionConfig) {
+      throw new Error('No connection configuration provided');
+    }
+
+    if (this.defaultConnection) {
+      return; // Already initialized
+    }
+
+    try {
+      const api = new ScreepsAPI(this.connectionConfig);
+      await api.authenticate();
+      this.defaultConnection = api;
+      this.connections.set('main', api);
+      console.error(`Successfully connected to Screeps server at ${this.connectionConfig.host}`);
+    } catch (error) {
+      console.error('Failed to connect to Screeps server:', error instanceof Error ? error.message : String(error));
+      throw error;
+    }
+  }
 
   getTools(): Tool[] {
     return [
-      {
-        name: 'screeps_connect',
-        description: 'Connect to a Screeps server with authentication',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            connectionName: {
-              type: 'string',
-              description: 'Name for this connection (e.g., "main", "ptr", "private")'
-            },
-            host: {
-              type: 'string',
-              description: 'Screeps server hostname',
-              default: 'screeps.com'
-            },
-            secure: {
-              type: 'boolean',
-              description: 'Use HTTPS/WSS',
-              default: true
-            },
-            username: {
-              type: 'string',
-              description: 'Screeps username (required if no token provided)'
-            },
-            password: {
-              type: 'string',
-              description: 'Screeps password (required if no token provided)'
-            },
-            token: {
-              type: 'string',
-              description: 'Screeps API token (alternative to username/password)'
-            },
-            shard: {
-              type: 'string',
-              description: 'Default shard name',
-              default: 'shard0'
-            }
-          },
-          required: ['connectionName']
-        }
-      },
       {
         name: 'screeps_console_command',
         description: 'Execute a console command on the Screeps server',
@@ -196,8 +181,6 @@ export class ScreepsTools {
   async handleToolCall(name: string, args: any): Promise<CallToolResult> {
     try {
       switch (name) {
-        case 'screeps_connect':
-          return await this.handleConnect(args);
         case 'screeps_console_command':
           return await this.handleConsoleCommand(args);
         case 'screeps_console_history':
@@ -226,26 +209,11 @@ export class ScreepsTools {
     }
   }
 
-  private async handleConnect(args: any): Promise<CallToolResult> {
-    const config = ConnectionConfigSchema.parse(args);
-    const connectionName = args.connectionName || 'main';
 
-    const api = new ScreepsAPI(config);
-    await api.authenticate();
-
-    this.connections.set(connectionName, api);
-
-    return {
-      content: [{
-        type: 'text',
-        text: `Successfully connected to Screeps server at ${config.host} as connection "${connectionName}"`
-      }]
-    };
-  }
 
   private async handleConsoleCommand(args: any): Promise<CallToolResult> {
     const connectionName = args.connectionName || 'main';
-    const api = this.getConnection(connectionName);
+    const api = await this.getConnection(connectionName);
 
     const result = await api.executeConsoleCommand(args.command, args.shard);
 
@@ -259,7 +227,7 @@ export class ScreepsTools {
 
   private async handleConsoleHistory(args: any): Promise<CallToolResult> {
     const connectionName = args.connectionName || 'main';
-    const api = this.getConnection(connectionName);
+    const api = await this.getConnection(connectionName);
     const limit = args.limit || 20;
 
     const messages = await api.getConsoleHistory(limit);
@@ -278,7 +246,7 @@ export class ScreepsTools {
 
   private async handleUserInfo(args: any): Promise<CallToolResult> {
     const connectionName = args.connectionName || 'main';
-    const api = this.getConnection(connectionName);
+    const api = await this.getConnection(connectionName);
 
     const userInfo = await api.getUserInfo();
 
@@ -292,7 +260,7 @@ export class ScreepsTools {
 
   private async handleRoomObjects(args: any): Promise<CallToolResult> {
     const connectionName = args.connectionName || 'main';
-    const api = this.getConnection(connectionName);
+    const api = await this.getConnection(connectionName);
 
     const objects = await api.getRoomObjects(args.roomName);
 
@@ -306,7 +274,7 @@ export class ScreepsTools {
 
   private async handleRoomTerrain(args: any): Promise<CallToolResult> {
     const connectionName = args.connectionName || 'main';
-    const api = this.getConnection(connectionName);
+    const api = await this.getConnection(connectionName);
 
     const terrain = await api.getRoomTerrain(args.roomName);
 
@@ -320,7 +288,7 @@ export class ScreepsTools {
 
   private async handleMemorySegmentGet(args: any): Promise<CallToolResult> {
     const connectionName = args.connectionName || 'main';
-    const api = this.getConnection(connectionName);
+    const api = await this.getConnection(connectionName);
 
     const segment = await api.getMemorySegment(args.segment);
 
@@ -334,7 +302,7 @@ export class ScreepsTools {
 
   private async handleMemorySegmentSet(args: any): Promise<CallToolResult> {
     const connectionName = args.connectionName || 'main';
-    const api = this.getConnection(connectionName);
+    const api = await this.getConnection(connectionName);
 
     await api.setMemorySegment(args.segment, args.data);
 
@@ -346,10 +314,15 @@ export class ScreepsTools {
     };
   }
 
-  private getConnection(connectionName: string): ScreepsAPI {
+  private async getConnection(connectionName: string): Promise<ScreepsAPI> {
+    // Initialize default connection if needed
+    if (connectionName === 'main' && !this.connections.has('main') && this.connectionConfig) {
+      await this.initializeDefaultConnection();
+    }
+
     const api = this.connections.get(connectionName);
     if (!api) {
-      throw new Error(`No connection found with name "${connectionName}". Please connect first using screeps_connect.`);
+      throw new Error(`No connection found with name "${connectionName}". Server must be started with authentication parameters.`);
     }
     return api;
   }
