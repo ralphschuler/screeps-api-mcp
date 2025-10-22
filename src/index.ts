@@ -2,11 +2,11 @@
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { 
+import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
   ErrorCode,
-  McpError
+  McpError,
 } from '@modelcontextprotocol/sdk/types.js';
 import { ScreepsTools } from './tools.js';
 import { Command } from 'commander';
@@ -24,8 +24,8 @@ class ScreepsMCPServer {
       },
       {
         capabilities: {
-          tools: {}
-        }
+          tools: {},
+        },
       }
     );
 
@@ -37,28 +37,25 @@ class ScreepsMCPServer {
     // Handle list tools requests
     this.server.setRequestHandler(ListToolsRequestSchema, async () => {
       return {
-        tools: this.tools.getTools()
+        tools: this.tools.getTools(),
       };
     });
 
     // Handle tool call requests
-    this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    this.server.setRequestHandler(CallToolRequestSchema, async request => {
       const { name, arguments: args } = request.params;
-      
+
       try {
         const result = await this.tools.handleToolCall(name, args || {});
         return result;
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        throw new McpError(
-          ErrorCode.InternalError,
-          `Tool execution failed: ${errorMessage}`
-        );
+        throw new McpError(ErrorCode.InternalError, `Tool execution failed: ${errorMessage}`);
       }
     });
 
     // Error handling
-    this.server.onerror = (error) => {
+    this.server.onerror = error => {
       console.error('[MCP Error]', error);
     };
 
@@ -78,7 +75,7 @@ class ScreepsMCPServer {
 // Parse command line arguments
 function parseCliArgs(): ConnectionConfig | undefined {
   const program = new Command();
-  
+
   program
     .name('screeps-api-mcp')
     .description('Screeps API MCP Server')
@@ -93,19 +90,23 @@ function parseCliArgs(): ConnectionConfig | undefined {
     .parse();
 
   const options = program.opts();
-  
+
   // Check for environment variables as fallback
   const token = options.token || process.env.SCREEPS_TOKEN;
   const username = options.username || process.env.SCREEPS_USERNAME;
   const password = options.password || process.env.SCREEPS_PASSWORD;
   const host = options.host || process.env.SCREEPS_HOST || 'screeps.com';
-  const secure = options.secure !== false && (process.env.SCREEPS_SECURE !== 'false');
+  const secure = options.secure !== false && process.env.SCREEPS_SECURE !== 'false';
   const shard = options.shard || process.env.SCREEPS_SHARD || 'shard0';
 
   // Validate authentication parameters
   if (!token && (!username || !password)) {
-    console.error('Error: Must provide either --token or both --username and --password (or use environment variables)');
-    console.error('Environment variables: SCREEPS_TOKEN, SCREEPS_USERNAME, SCREEPS_PASSWORD, SCREEPS_HOST, SCREEPS_SECURE, SCREEPS_SHARD');
+    console.error(
+      'Error: Must provide either --token or both --username and --password (or use environment variables)'
+    );
+    console.error(
+      'Environment variables: SCREEPS_TOKEN, SCREEPS_USERNAME, SCREEPS_PASSWORD, SCREEPS_HOST, SCREEPS_SECURE, SCREEPS_SHARD'
+    );
     process.exit(1);
   }
 
@@ -115,14 +116,14 @@ function parseCliArgs(): ConnectionConfig | undefined {
     username,
     password,
     token,
-    shard
+    shard,
   };
 }
 
 // Start the server
 const connectionConfig = parseCliArgs();
 const server = new ScreepsMCPServer(connectionConfig);
-server.start().catch((error) => {
+server.start().catch(error => {
   console.error('Failed to start server:', error);
   process.exit(1);
 });

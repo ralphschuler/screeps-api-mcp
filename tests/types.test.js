@@ -5,7 +5,7 @@ import {
   ConsoleMessageSchema,
   UserInfoSchema,
   RoomObjectSchema,
-  MemorySegmentSchema
+  MemorySegmentSchema,
 } from '../dist/types.js';
 
 describe('Types Module', () => {
@@ -28,7 +28,7 @@ describe('Types Module', () => {
         username: 'testuser',
         password: 'testpass',
         host: 'private.server.com',
-        secure: false
+        secure: false,
       };
       const result = ConnectionConfigSchema.parse(config);
       assert.strictEqual(result.username, 'testuser');
@@ -42,7 +42,7 @@ describe('Types Module', () => {
     test('validates basic console message', () => {
       const message = {
         line: 'console output',
-        shard: 'shard0'
+        shard: 'shard0',
       };
       const result = ConsoleMessageSchema.parse(message);
       assert.strictEqual(result.line, 'console output');
@@ -54,7 +54,7 @@ describe('Types Module', () => {
         line: 'Game.time: 12345',
         shard: 'shard1',
         timestamp: 1635724800000,
-        type: 'result'
+        type: 'result',
       };
       const result = ConsoleMessageSchema.parse(message);
       assert.deepStrictEqual(result, message);
@@ -64,7 +64,7 @@ describe('Types Module', () => {
       const message = {
         line: 'test',
         shard: 'shard0',
-        type: 'invalid-type'
+        type: 'invalid-type',
       };
       assert.throws(() => ConsoleMessageSchema.parse(message));
     });
@@ -83,7 +83,7 @@ describe('Types Module', () => {
         _id: 'user123',
         username: 'testplayer',
         gcl: { level: 5, progress: 150000, progressTotal: 200000 },
-        credits: 1000
+        credits: 1000,
       };
       const result = UserInfoSchema.parse(userInfo);
       assert.deepStrictEqual(result, userInfo);
@@ -97,7 +97,7 @@ describe('Types Module', () => {
         room: 'W1N1',
         x: 25,
         y: 25,
-        type: 'creep'
+        type: 'creep',
       };
       const result = RoomObjectSchema.parse(obj);
       assert.deepStrictEqual(result, obj);
@@ -110,7 +110,7 @@ describe('Types Module', () => {
         x: 10,
         y: 15,
         type: 'structure',
-        user: 'player123'
+        user: 'player123',
       };
       const result = RoomObjectSchema.parse(obj);
       assert.deepStrictEqual(result, obj);

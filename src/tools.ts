@@ -1,6 +1,6 @@
 import { Tool, CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { ScreepsAPI } from './screeps-api.js';
-import { ConnectionConfig, ConnectionConfigSchema } from './types.js';
+import { ConnectionConfig } from './types.js';
 
 export class ScreepsTools {
   private connections = new Map<string, ScreepsAPI>();
@@ -26,7 +26,10 @@ export class ScreepsTools {
       this.connections.set('main', api);
       console.error(`Successfully connected to Screeps server at ${this.connectionConfig.host}`);
     } catch (error) {
-      console.error('Failed to connect to Screeps server:', error instanceof Error ? error.message : String(error));
+      console.error(
+        'Failed to connect to Screeps server:',
+        error instanceof Error ? error.message : String(error)
+      );
       throw error;
     }
   }
@@ -42,19 +45,19 @@ export class ScreepsTools {
             connectionName: {
               type: 'string',
               description: 'Name of the connection to use',
-              default: 'main'
+              default: 'main',
             },
             command: {
               type: 'string',
-              description: 'JavaScript code to execute in the Screeps console'
+              description: 'JavaScript code to execute in the Screeps console',
             },
             shard: {
               type: 'string',
-              description: 'Shard to execute command on (optional, uses connection default)'
-            }
+              description: 'Shard to execute command on (optional, uses connection default)',
+            },
           },
-          required: ['command']
-        }
+          required: ['command'],
+        },
       },
       {
         name: 'screeps_console_history',
@@ -65,17 +68,17 @@ export class ScreepsTools {
             connectionName: {
               type: 'string',
               description: 'Name of the connection to use',
-              default: 'main'
+              default: 'main',
             },
             limit: {
               type: 'number',
               description: 'Maximum number of messages to retrieve',
               default: 20,
               minimum: 1,
-              maximum: 100
-            }
-          }
-        }
+              maximum: 100,
+            },
+          },
+        },
       },
       {
         name: 'screeps_user_info',
@@ -86,10 +89,10 @@ export class ScreepsTools {
             connectionName: {
               type: 'string',
               description: 'Name of the connection to use',
-              default: 'main'
-            }
-          }
-        }
+              default: 'main',
+            },
+          },
+        },
       },
       {
         name: 'screeps_room_objects',
@@ -100,15 +103,15 @@ export class ScreepsTools {
             connectionName: {
               type: 'string',
               description: 'Name of the connection to use',
-              default: 'main'
+              default: 'main',
             },
             roomName: {
               type: 'string',
-              description: 'Name of the room (e.g., "W1N1")'
-            }
+              description: 'Name of the room (e.g., "W1N1")',
+            },
           },
-          required: ['roomName']
-        }
+          required: ['roomName'],
+        },
       },
       {
         name: 'screeps_room_terrain',
@@ -119,15 +122,15 @@ export class ScreepsTools {
             connectionName: {
               type: 'string',
               description: 'Name of the connection to use',
-              default: 'main'
+              default: 'main',
             },
             roomName: {
               type: 'string',
-              description: 'Name of the room (e.g., "W1N1")'
-            }
+              description: 'Name of the room (e.g., "W1N1")',
+            },
           },
-          required: ['roomName']
-        }
+          required: ['roomName'],
+        },
       },
       {
         name: 'screeps_memory_segment_get',
@@ -138,17 +141,17 @@ export class ScreepsTools {
             connectionName: {
               type: 'string',
               description: 'Name of the connection to use',
-              default: 'main'
+              default: 'main',
             },
             segment: {
               type: 'number',
               description: 'Memory segment number (0-99)',
               minimum: 0,
-              maximum: 99
-            }
+              maximum: 99,
+            },
           },
-          required: ['segment']
-        }
+          required: ['segment'],
+        },
       },
       {
         name: 'screeps_memory_segment_set',
@@ -159,22 +162,22 @@ export class ScreepsTools {
             connectionName: {
               type: 'string',
               description: 'Name of the connection to use',
-              default: 'main'
+              default: 'main',
             },
             segment: {
               type: 'number',
               description: 'Memory segment number (0-99)',
               minimum: 0,
-              maximum: 99
+              maximum: 99,
             },
             data: {
               type: 'string',
-              description: 'Data to store in the memory segment'
-            }
+              description: 'Data to store in the memory segment',
+            },
           },
-          required: ['segment', 'data']
-        }
-      }
+          required: ['segment', 'data'],
+        },
+      },
     ];
   }
 
@@ -198,18 +201,21 @@ export class ScreepsTools {
         default:
           return {
             content: [{ type: 'text', text: `Unknown tool: ${name}` }],
-            isError: true
+            isError: true,
           };
       }
     } catch (error) {
       return {
-        content: [{ type: 'text', text: `Error: ${error instanceof Error ? error.message : String(error)}` }],
-        isError: true
+        content: [
+          {
+            type: 'text',
+            text: `Error: ${error instanceof Error ? error.message : String(error)}`,
+          },
+        ],
+        isError: true,
       };
     }
   }
-
-
 
   private async handleConsoleCommand(args: any): Promise<CallToolResult> {
     const connectionName = args.connectionName || 'main';
@@ -218,10 +224,12 @@ export class ScreepsTools {
     const result = await api.executeConsoleCommand(args.command, args.shard);
 
     return {
-      content: [{
-        type: 'text',
-        text: `Console command executed successfully. Timestamp: ${result.timestamp}`
-      }]
+      content: [
+        {
+          type: 'text',
+          text: `Console command executed successfully. Timestamp: ${result.timestamp}`,
+        },
+      ],
     };
   }
 
@@ -232,15 +240,19 @@ export class ScreepsTools {
 
     const messages = await api.getConsoleHistory(limit);
 
-    const formattedMessages = messages.map(msg => 
-      `[${msg.shard}] ${new Date(msg.timestamp || Date.now()).toISOString()}: ${msg.line}`
-    ).join('\n');
+    const formattedMessages = messages
+      .map(
+        msg => `[${msg.shard}] ${new Date(msg.timestamp || Date.now()).toISOString()}: ${msg.line}`
+      )
+      .join('\n');
 
     return {
-      content: [{
-        type: 'text',
-        text: `Console History (last ${messages.length} messages):\n\n${formattedMessages}`
-      }]
+      content: [
+        {
+          type: 'text',
+          text: `Console History (last ${messages.length} messages):\n\n${formattedMessages}`,
+        },
+      ],
     };
   }
 
@@ -251,10 +263,12 @@ export class ScreepsTools {
     const userInfo = await api.getUserInfo();
 
     return {
-      content: [{
-        type: 'text',
-        text: `User Info:\n${JSON.stringify(userInfo, null, 2)}`
-      }]
+      content: [
+        {
+          type: 'text',
+          text: `User Info:\n${JSON.stringify(userInfo, null, 2)}`,
+        },
+      ],
     };
   }
 
@@ -265,10 +279,12 @@ export class ScreepsTools {
     const objects = await api.getRoomObjects(args.roomName);
 
     return {
-      content: [{
-        type: 'text',
-        text: `Room Objects in ${args.roomName} (${objects.length} objects):\n${JSON.stringify(objects, null, 2)}`
-      }]
+      content: [
+        {
+          type: 'text',
+          text: `Room Objects in ${args.roomName} (${objects.length} objects):\n${JSON.stringify(objects, null, 2)}`,
+        },
+      ],
     };
   }
 
@@ -279,10 +295,12 @@ export class ScreepsTools {
     const terrain = await api.getRoomTerrain(args.roomName);
 
     return {
-      content: [{
-        type: 'text',
-        text: `Room Terrain for ${args.roomName}:\n${JSON.stringify(terrain, null, 2)}`
-      }]
+      content: [
+        {
+          type: 'text',
+          text: `Room Terrain for ${args.roomName}:\n${JSON.stringify(terrain, null, 2)}`,
+        },
+      ],
     };
   }
 
@@ -293,10 +311,12 @@ export class ScreepsTools {
     const segment = await api.getMemorySegment(args.segment);
 
     return {
-      content: [{
-        type: 'text',
-        text: `Memory Segment ${args.segment}:\n${segment.data}`
-      }]
+      content: [
+        {
+          type: 'text',
+          text: `Memory Segment ${args.segment}:\n${segment.data}`,
+        },
+      ],
     };
   }
 
@@ -307,10 +327,12 @@ export class ScreepsTools {
     await api.setMemorySegment(args.segment, args.data);
 
     return {
-      content: [{
-        type: 'text',
-        text: `Memory segment ${args.segment} updated successfully`
-      }]
+      content: [
+        {
+          type: 'text',
+          text: `Memory segment ${args.segment} updated successfully`,
+        },
+      ],
     };
   }
 
@@ -322,7 +344,9 @@ export class ScreepsTools {
 
     const api = this.connections.get(connectionName);
     if (!api) {
-      throw new Error(`No connection found with name "${connectionName}". Server must be started with authentication parameters.`);
+      throw new Error(
+        `No connection found with name "${connectionName}". Server must be started with authentication parameters.`
+      );
     }
     return api;
   }

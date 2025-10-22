@@ -238,12 +238,112 @@ npm install
 npm run build
 ```
 
-### Running in Development
+### Testing
+
+The project includes comprehensive test coverage:
 
 ```bash
-npm run dev  # Watch mode
-npm start    # Run built version
+npm test              # Run all tests
+npm run test:coverage # Run tests with coverage report
+npm run test:watch    # Run tests in watch mode
 ```
+
+### Development Workflow
+
+```bash
+npm run dev          # Build in watch mode
+npm run lint         # Run ESLint
+npm run lint:fix     # Fix linting issues
+npm run format       # Format code with Prettier
+npm start           # Run built version
+```
+
+### Docker Development
+
+Build and run with Docker:
+
+```bash
+# Build the image
+docker build -t screeps-api-mcp .
+
+# Run with environment variables
+docker run --rm -e SCREEPS_TOKEN=your-token screeps-api-mcp --help
+
+# Or use docker-compose
+cp .env.example .env  # Edit with your credentials
+docker-compose up screeps-api-mcp
+```
+
+### CI/CD Pipeline
+
+The project uses GitHub Actions for continuous integration:
+
+- **CI Pipeline** (`ci.yml`): Runs tests, linting, and builds on multiple Node.js versions
+- **Docker Pipeline** (`docker.yml`): Builds and publishes Docker images to GitHub Container Registry
+- **Release Pipeline** (`release.yml`): Automated releases with npm publishing and binary builds
+
+All pushes and pull requests are automatically tested across Node.js 18, 20, and 22.
+
+## Deployment
+
+### Docker Deployment
+
+**GitHub Container Registry (Recommended):**
+```bash
+docker pull ghcr.io/ralphschuler/screeps-api-mcp:latest
+docker run --rm -e SCREEPS_TOKEN=your-token ghcr.io/ralphschuler/screeps-api-mcp:latest --help
+```
+
+**Using Docker Compose:**
+```bash
+# Copy and edit environment file
+cp .env.example .env
+
+# Run the service
+docker-compose up -d screeps-api-mcp
+```
+
+**Kubernetes Deployment:**
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: screeps-api-mcp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: screeps-api-mcp
+  template:
+    metadata:
+      labels:
+        app: screeps-api-mcp
+    spec:
+      containers:
+      - name: screeps-api-mcp
+        image: ghcr.io/ralphschuler/screeps-api-mcp:latest
+        env:
+        - name: SCREEPS_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: screeps-credentials
+              key: token
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "500m"
+```
+
+### Production Considerations
+
+- Use API tokens instead of username/password for better security
+- Set up monitoring and health checks
+- Consider rate limiting when connecting to official Screeps servers
+- Use container orchestration (Docker Swarm, Kubernetes) for high availability
+- Configure log aggregation for debugging
 
 ## License
 
@@ -251,7 +351,7 @@ MIT License - see LICENSE file for details.
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit issues and pull requests.
+Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines on development setup, testing, and submitting pull requests.
 
 ## Related Projects
 
