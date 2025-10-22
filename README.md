@@ -28,44 +28,82 @@ npx screeps-api-mcp
 
 ### Starting the Server
 
-The MCP server communicates over stdio:
+The MCP server communicates over stdio and requires authentication credentials to be provided on startup:
 
+**Using API Token (recommended):**
 ```bash
+screeps-api-mcp --token your-api-token-here
+```
+
+**Using Username/Password:**
+```bash
+screeps-api-mcp --username myuser --password mypass
+```
+
+**Using Environment Variables:**
+```bash
+export SCREEPS_TOKEN=your-api-token-here
 screeps-api-mcp
+```
+
+**All CLI Options:**
+```bash
+screeps-api-mcp [options]
+
+Options:
+  --token <token>        Screeps API token
+  --username <username>  Screeps username
+  --password <password>  Screeps password
+  --host <host>          Screeps server host (default: "screeps.com")
+  --secure               Use HTTPS/WSS (default: true)
+  --no-secure            Use HTTP/WS
+  --shard <shard>        Default shard (default: "shard0")
+  -h, --help             Display help
 ```
 
 ### Configuration with MCP Clients
 
 Add to your MCP client configuration (e.g., Claude Desktop):
 
+**Using API Token:**
 ```json
 {
   "mcpServers": {
     "screeps-api": {
-      "command": "screeps-api-mcp"
+      "command": "screeps-api-mcp",
+      "args": ["--token", "your-api-token-here"]
     }
   }
 }
 ```
 
+**Using Environment Variables:**
+```json
+{
+  "mcpServers": {
+    "screeps-api": {
+      "command": "screeps-api-mcp",
+      "env": {
+        "SCREEPS_TOKEN": "your-api-token-here"
+      }
+    }
+  }
+}
+```
+
+### Environment Variables
+
+The following environment variables are supported:
+- `SCREEPS_TOKEN` - Screeps API token
+- `SCREEPS_USERNAME` - Screeps username  
+- `SCREEPS_PASSWORD` - Screeps password
+- `SCREEPS_HOST` - Server hostname (default: screeps.com)
+- `SCREEPS_SECURE` - Use HTTPS/WSS (default: true)
+- `SCREEPS_SHARD` - Default shard (default: shard0)
+
 ### Available Tools
 
-#### `screeps_connect`
-Connect to a Screeps server with authentication.
 
-**Parameters:**
-- `connectionName` (string): Name for this connection (e.g., "main", "ptr")
-- `host` (string): Server hostname (default: "screeps.com")
-- `secure` (boolean): Use HTTPS/WSS (default: true)
-- `username` (string): Screeps username (if not using token)
-- `password` (string): Screeps password (if not using token)
-- `token` (string): Screeps API token (alternative to username/password)
-- `shard` (string): Default shard name (default: "shard0")
-
-**Example:**
-```
-Connect to main server: screeps_connect with connectionName="main", username="myuser", password="mypass"
-```
 
 #### `screeps_console_command`
 Execute JavaScript code in the Screeps console.
@@ -126,9 +164,9 @@ Store data in a memory segment.
 
 ### Basic Usage Flow
 
-1. **Connect to Screeps:**
-   ```
-   screeps_connect with connectionName="main", username="myuser", password="mypass"
+1. **Start server with authentication:**
+   ```bash
+   screeps-api-mcp --token your-api-token-here
    ```
 
 2. **Check your account:**
@@ -151,21 +189,23 @@ Store data in a memory segment.
    screeps_room_objects with roomName="E1S1"
    ```
 
-### Working with Multiple Servers
+### Working with Different Servers
 
+The server connects to a single Screeps server on startup. To work with different servers, start separate MCP server instances:
+
+**Main Server:**
+```bash
+screeps-api-mcp --token your-token
 ```
-# Connect to main server
-screeps_connect with connectionName="main", username="user", password="pass"
 
-# Connect to PTR
-screeps_connect with connectionName="ptr", host="screeps.com/ptr", username="user", password="pass"
+**PTR Server:**
+```bash
+screeps-api-mcp --token your-token --host screeps.com/ptr
+```
 
-# Connect to private server
-screeps_connect with connectionName="private", host="server.example.com", secure=false, username="user", password="pass"
-
-# Use specific connections
-screeps_console_command with connectionName="ptr", command="Game.time"
-screeps_user_info with connectionName="private"
+**Private Server:**
+```bash
+screeps-api-mcp --token your-token --host server.example.com --no-secure
 ```
 
 ## API Token Authentication

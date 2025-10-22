@@ -2,7 +2,7 @@
   "mcpServers": {
     "screeps-api": {
       "command": "screeps-api-mcp",
-      "args": []
+      "args": ["--token", "your-api-token-here"]
     }
   }
 }
