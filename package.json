@@ -8,7 +8,13 @@
     "build": "tsc",
     "dev": "tsc --watch",
     "start": "node dist/index.js",
-    "test": "node --test",
+    "test": "npm run build && node --test tests/*.test.js",
+    "test:watch": "npm run build && node --test --watch tests/*.test.js",
+    "test:coverage": "npm run build && node --test --experimental-test-coverage tests/*.test.js",
+    "lint": "npx eslint src/**/*.ts",
+    "lint:fix": "npx eslint src/**/*.ts --fix",
+    "format": "npx prettier --write src/**/*.ts",
+    "format:check": "npx prettier --check src/**/*.ts",
     "setup:claude": "node scripts/setup-claude.js",
     "prepublishOnly": "npm run build"
   },
@@ -31,6 +37,10 @@
   "devDependencies": {
     "@types/node": "^20.0.0",
     "@types/ws": "^8.5.10",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "eslint": "^9.0.0",
+    "prettier": "^3.0.0",
     "typescript": "^5.0.0"
   },
   "bin": {
