@@ -1,0 +1,10 @@
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY package*.json ./
+COPY . .
+RUN echo "Before npm ci:"
+RUN ls -la
+RUN npm ci
+RUN echo "After npm ci:"
+RUN ls -la
+RUN ls -la node_modules/ | head -10
