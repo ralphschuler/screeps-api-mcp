@@ -32,58 +32,58 @@ export class ScreepsAPI {
       const response = await fetch(`${this.baseUrl}/api/auth/signin`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           email: this.config.username,
-          password: this.config.password
-        })
+          password: this.config.password,
+        }),
       });
 
       if (!response.ok) {
         throw new Error(`Authentication failed: ${response.statusText}`);
       }
 
-      const authResult = await response.json() as { token: string };
+      const authResult = (await response.json()) as { token: string };
       this.token = authResult.token;
     }
-    
+
     // Get user info to get user ID
     await this.getUserInfo();
   }
 
   private async generateAuthToken(username: string, password: string): Promise<string> {
     const authtype = {
-      type: "full",
+      type: 'full',
       endpoints: {
-        "GET /api/user/name": false,
-        "GET /api/user/money-history": false,
-        "GET /api/market/my-orders": false,
-        "GET /api/user/memory": false,
-        "GET /api/user/memory-segment": false,
-        "POST /api/user/memory-segment": false
+        'GET /api/user/name': false,
+        'GET /api/user/money-history': false,
+        'GET /api/market/my-orders': false,
+        'GET /api/user/memory': false,
+        'GET /api/user/memory-segment': false,
+        'POST /api/user/memory-segment': false,
       },
       websockets: {
-        "console": false,
-        "rooms": false
+        console: false,
+        rooms: false,
       },
-      memorySegments: ""
+      memorySegments: '',
     };
 
     const response = await fetch(`${this.baseUrl}/api/user/auth-token`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': 'Basic ' + Buffer.from(username + ':' + password).toString('base64')
+        Authorization: 'Basic ' + Buffer.from(username + ':' + password).toString('base64'),
       },
-      body: JSON.stringify(authtype)
+      body: JSON.stringify(authtype),
     });
 
     if (!response.ok) {
       throw new Error(`Token generation failed: ${response.statusText}`);
     }
 
-    const result = await response.json() as { token: string };
+    const result = (await response.json()) as { token: string };
     return result.token;
   }
 
@@ -108,22 +108,25 @@ export class ScreepsAPI {
     const response = await this.apiRequest(`/api/user/memory-segment?segment=${segment}`);
     return {
       segment,
-      data: (response as { data: string }).data || ''
+      data: (response as { data: string }).data || '',
     };
   }
 
   async setMemorySegment(segment: number, data: string): Promise<void> {
     await this.apiRequest('/api/user/memory-segment', 'POST', {
       segment,
-      data
+      data,
     });
   }
 
-  async executeConsoleCommand(command: string, shard?: string): Promise<{ ok: number; timestamp: number }> {
+  async executeConsoleCommand(
+    command: string,
+    shard?: string
+  ): Promise<{ ok: number; timestamp: number }> {
     const targetShard = shard || this.config.shard;
     const response = await this.apiRequest('/api/user/console', 'POST', {
       expression: command,
-      shard: targetShard
+      shard: targetShard,
     });
     return response as { ok: number; timestamp: number };
   }
@@ -131,12 +134,12 @@ export class ScreepsAPI {
   async getConsoleHistory(limit: number = 20): Promise<ConsoleMessage[]> {
     const response = await this.apiRequest(`/api/user/console?limit=${limit}`);
     const messages = (response as { messages: any[] }).messages || [];
-    
+
     return messages.map(msg => ({
       line: msg.line || msg.message || '',
       shard: msg.shard || this.config.shard,
       timestamp: msg.timestamp || Date.now(),
-      type: this.determineMessageType(msg)
+      type: this.determineMessageType(msg),
     }));
   }
 
@@ -155,7 +158,7 @@ export class ScreepsAPI {
 
     ws.on('message', (data: Buffer) => {
       const message = data.toString();
-      
+
       if (message.startsWith('auth ok')) {
         // Subscribe to console messages
         ws.send(`subscribe user:${this.userId}/console`);
@@ -171,6 +174,7 @@ export class ScreepsAPI {
       try {
         if (message.startsWith('gz')) {
           const compressed = Buffer.from(message.substring(3), 'base64');
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
           const zlib = require('zlib');
           const decompressed = zlib.inflateSync(compressed);
           parsedMessage = JSON.parse(decompressed.toString());
@@ -203,8 +207,8 @@ export class ScreepsAPI {
       method,
       headers: {
         'X-Token': this.token,
-        'Content-Type': 'application/json'
-      }
+        'Content-Type': 'application/json',
+      },
     };
 
     if (body && method !== 'GET') {
@@ -212,7 +216,7 @@ export class ScreepsAPI {
     }
 
     const response = await fetch(`${this.baseUrl}${path}`, options);
-    
+
     if (!response.ok) {
       throw new Error(`API request failed: ${response.status} ${response.statusText}`);
     }
@@ -221,9 +225,9 @@ export class ScreepsAPI {
   }
 
   private determineMessageType(message: any): 'log' | 'result' | 'error' | 'highlight' {
-    if (message.type === 'result') return 'result';
-    if (message.type === 'error') return 'error';
-    if (message.type === 'highlight') return 'highlight';
+    if (message.type === 'result') {return 'result';}
+    if (message.type === 'error') {return 'error';}
+    if (message.type === 'highlight') {return 'highlight';}
     return 'log';
   }
 
@@ -235,7 +239,7 @@ export class ScreepsAPI {
         console.log(`${shard}: ${this.stripHtmlTags(line)}`);
       });
     }
-    
+
     if (messages.results) {
       messages.results.forEach((line: string) => {
         console.log(`${shard}: [RESULT] ${this.stripHtmlTags(line)}`);

@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  screeps-api-mcp:
+    build: .
+    image: ghcr.io/ralphschuler/screeps-api-mcp:latest
+    container_name: screeps-api-mcp
+    restart: unless-stopped
+    
+    # Configuration via environment variables
+    environment:
+      - SCREEPS_TOKEN=${SCREEPS_TOKEN}
+      - SCREEPS_HOST=${SCREEPS_HOST:-screeps.com}
+      - SCREEPS_SECURE=${SCREEPS_SECURE:-true}
+      - SCREEPS_SHARD=${SCREEPS_SHARD:-shard0}
+    
+    # Volumes for persistent data (if needed)
+    volumes:
+      - ./data:/app/data
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "node", "-e", "console.log('Health check')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    
+    # Security
+    user: "1001:1001"
+    read_only: true
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+
+  # Example: MCP Client (Claude Desktop equivalent)
+  mcp-client:
+    image: node:20-alpine
+    container_name: mcp-client
+    depends_on:
+      - screeps-api-mcp
+    volumes:
+      - ./examples:/examples
+    working_dir: /examples
+    command: tail -f /dev/null  # Keep container running for testing
+    profiles:
+      - testing
