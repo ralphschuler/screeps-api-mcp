@@ -118,9 +118,9 @@ export class ScreepsAPI {
     return (response as { objects: RoomObject[] }).objects || [];
   }
 
-  async getRoomTerrain(roomName: string): Promise<any> {
+  async getRoomTerrain(roomName: string): Promise<{ terrain: string | number[] }> {
     const response = await this.apiRequest(`/api/game/room-terrain?room=${roomName}&encoded=1`);
-    return response;
+    return response as { terrain: string | number[] };
   }
 
   async getMemorySegment(segment: number): Promise<MemorySegment> {
@@ -178,7 +178,18 @@ export class ScreepsAPI {
 
   async getConsoleHistory(limit: number = 20): Promise<ConsoleMessage[]> {
     const response = await this.apiRequest(`/api/user/console?limit=${limit}`);
-    const messages = (response as { messages: any[] }).messages || [];
+    
+    interface ConsoleHistoryResponse {
+      messages?: Array<{
+        line?: string;
+        message?: string;
+        shard?: string;
+        timestamp?: number;
+        type?: string;
+      }>;
+    }
+    
+    const messages = (response as ConsoleHistoryResponse).messages || [];
 
     return messages.map(msg => ({
       line: msg.line || msg.message || '',
@@ -304,7 +315,17 @@ export class ScreepsAPI {
   }
 
   private handleConsoleSocketPayload(message: string): void {
-    let parsedMessage: any;
+    interface SocketMessage {
+      messages?: {
+        log?: string[];
+        results?: string[];
+        errors?: string[];
+        highlight?: string[];
+      };
+      shard?: string;
+    }
+
+    let parsedMessage: unknown;
     try {
       parsedMessage = this.parseSocketMessage(message);
     } catch (error) {
@@ -312,15 +333,15 @@ export class ScreepsAPI {
       return;
     }
 
-    if (parsedMessage && Array.isArray(parsedMessage) && parsedMessage.length > 1) {
-      const messageData = parsedMessage[1];
+    if (Array.isArray(parsedMessage) && parsedMessage.length > 1) {
+      const messageData = parsedMessage[1] as SocketMessage;
       if (messageData && messageData.messages) {
         this.processConsoleMessages(messageData.messages, messageData.shard || this.consoleShard || this.config.shard);
       }
     }
   }
 
-  private parseSocketMessage(message: string): any {
+  private parseSocketMessage(message: string): unknown {
     if (message.startsWith('gz')) {
       const compressed = Buffer.from(message.substring(3), 'base64');
       const decompressed = inflateSync(compressed);
@@ -330,7 +351,15 @@ export class ScreepsAPI {
     return JSON.parse(message);
   }
 
-  private processConsoleMessages(messages: any, shard: string): void {
+  private processConsoleMessages(
+    messages: {
+      log?: string[];
+      results?: string[];
+      errors?: string[];
+      highlight?: string[];
+    }, 
+    shard: string
+  ): void {
     const pushMessage = (line: string, type: ConsoleMessage['type']) => {
       const entry: ConsoleMessage = {
         line: this.stripHtmlTags(line),
@@ -361,7 +390,7 @@ export class ScreepsAPI {
     }
   }
 
-  private determineMessageType(message: any): 'log' | 'result' | 'error' | 'highlight' {
+  private determineMessageType(message: { type?: string }): 'log' | 'result' | 'error' | 'highlight' {
     if (message.type === 'result') {
       return 'result';
     }
@@ -378,15 +407,21 @@ export class ScreepsAPI {
     return html.replace(/<[^>]*>/g, '');
   }
 
-  private async apiRequest(path: string, method: string = 'GET', body?: any): Promise<any> {
+  private async apiRequest(path: string, method: string = 'GET', body?: unknown): Promise<unknown> {
     if (!this.token) {
       await this.authenticate();
     }
 
-    const options: any = {
+    interface RequestOptions {
+      method: string;
+      headers: Record<string, string>;
+      body?: string;
+    }
+
+    const options: RequestOptions = {
       method,
       headers: {
-        'X-Token': this.token,
+        'X-Token': this.token!,
         'Content-Type': 'application/json',
       },
     };
@@ -412,7 +447,7 @@ export class ScreepsAPI {
 
     try {
       return JSON.parse(text);
-    } catch (error) {
+    } catch {
       return { data: text };
     }
   }
