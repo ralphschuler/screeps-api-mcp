@@ -5,12 +5,12 @@ A Model Context Protocol (MCP) server that provides tools for interacting with S
 ## Features
 
 - **Authentication**: Connect to Screeps servers using username/password or API tokens
-- **Console Commands**: Execute JavaScript code in the Screeps console
-- **Console History**: Retrieve recent console output and messages
-- **Room Data**: Access room objects and terrain information
-- **Memory Segments**: Read and write Screeps memory segments
-- **User Information**: Get account details and statistics
-- **Multiple Connections**: Manage connections to different servers (main, PTR, private servers)
+- **Secure Connection Initialization**: Provide credentials once at startup to establish the single connection used by all tools
+- **Console Commands & History**: Execute JavaScript commands and retrieve recent console output
+- **Live Console Streaming**: Start, read, and stop a persistent websocket console stream with in-memory buffering
+- **Memory Access**: Read/write/delete arbitrary `Memory` paths and manage memory segments
+- **Room & Shard Data**: Access room objects, terrain information, and shard metadata
+- **User Information**: Get account details and statistics for the authenticated player
 
 ## Installation
 
@@ -103,60 +103,98 @@ The following environment variables are supported:
 
 ### Available Tools
 
+#### `screeps_connection_status`
+Show connection details for the configured Screeps server, including console stream state.
 
+**Parameters:**
+- _None_
 
 #### `screeps_console_command`
 Execute JavaScript code in the Screeps console.
 
 **Parameters:**
-- `connectionName` (string): Connection to use (default: "main")
 - `command` (string): JavaScript code to execute
-- `shard` (string): Target shard (optional)
-
-**Example:**
-```
-Execute console command: screeps_console_command with command="Game.time"
-```
+- `shard` (string): Target shard override (optional)
 
 #### `screeps_console_history`
 Retrieve recent console messages.
 
 **Parameters:**
-- `connectionName` (string): Connection to use (default: "main")
-- `limit` (number): Max messages to retrieve (default: 20, max: 100)
+- `limit` (number): Max messages to retrieve (default: 20, max: 200)
+
+#### `screeps_console_stream_start`
+Open a persistent websocket console stream and buffer messages in memory.
+
+**Parameters:**
+- `shard` (string): Optional shard override
+- `bufferSize` (number): Max buffered messages (default: 500)
+
+#### `screeps_console_stream_read`
+Read buffered console messages captured by the live stream.
+
+**Parameters:**
+- `limit` (number): Max messages to return (default: 50, max: 500)
+- `since` (number): Only include messages newer than this timestamp (ms)
+
+#### `screeps_console_stream_stop`
+Stop the live console stream and release the websocket connection.
+
+**Parameters:**
+- _None_
 
 #### `screeps_user_info`
 Get information about the authenticated user.
 
 **Parameters:**
-- `connectionName` (string): Connection to use (default: "main")
+- _None_
+
+#### `screeps_shards_info`
+Fetch shard metadata from the server.
+
+**Parameters:**
+- _None_
 
 #### `screeps_room_objects`
 Get all objects in a specific room.
 
 **Parameters:**
-- `connectionName` (string): Connection to use (default: "main")
 - `roomName` (string): Room name (e.g., "W1N1")
 
 #### `screeps_room_terrain`
 Get terrain data for a room.
 
 **Parameters:**
-- `connectionName` (string): Connection to use (default: "main")
 - `roomName` (string): Room name (e.g., "W1N1")
+
+#### `screeps_memory_get`
+Read a value from the Screeps `Memory` object.
+
+**Parameters:**
+- `path` (string): Memory path (e.g., "stats.cpu")
+
+#### `screeps_memory_set`
+Write a value into the Screeps `Memory` object.
+
+**Parameters:**
+- `path` (string): Memory path
+- `value` (string): Stringified JSON or raw string value to store
+
+#### `screeps_memory_delete`
+Remove a value from the Screeps `Memory` object.
+
+**Parameters:**
+- `path` (string): Memory path to delete
 
 #### `screeps_memory_segment_get`
 Retrieve data from a memory segment.
 
 **Parameters:**
-- `connectionName` (string): Connection to use (default: "main")
 - `segment` (number): Segment number (0-99)
 
 #### `screeps_memory_segment_set`
 Store data in a memory segment.
 
 **Parameters:**
-- `connectionName` (string): Connection to use (default: "main")
 - `segment` (number): Segment number (0-99)
 - `data` (string): Data to store
 
@@ -164,58 +202,50 @@ Store data in a memory segment.
 
 ### Basic Usage Flow
 
-1. **Start server with authentication:**
+1. **Start the MCP server:**
    ```bash
    screeps-api-mcp --token your-api-token-here
    ```
 
-2. **Check your account:**
+2. **Verify the authenticated connection:**
    ```
-   screeps_user_info
+   screeps_connection_status
    ```
 
-3. **Execute console commands:**
+3. **Start a live console stream and begin buffering logs:**
+   ```
+   screeps_console_stream_start with bufferSize=500
+   ```
+
+4. **Execute console commands:**
    ```
    screeps_console_command with command="Memory.stats = { cpu: Game.cpu.getUsed() }"
    ```
 
-4. **View console output:**
+5. **Read the buffered stream output or request history:**
    ```
-   screeps_console_history with limit=10
+   screeps_console_stream_read with limit=20
+   ```
+   ```
+   screeps_console_history with limit=20
    ```
 
-5. **Examine a room:**
+6. **Inspect rooms or memory:**
    ```
    screeps_room_objects with roomName="E1S1"
    ```
-
-### Working with Different Servers
-
-The server connects to a single Screeps server on startup. To work with different servers, start separate MCP server instances:
-
-**Main Server:**
-```bash
-screeps-api-mcp --token your-token
-```
-
-**PTR Server:**
-```bash
-screeps-api-mcp --token your-token --host screeps.com/ptr
-```
-
-**Private Server:**
-```bash
-screeps-api-mcp --token your-token --host server.example.com --no-secure
-```
+   ```
+   screeps_memory_get with path="stats"
+   ```
 
 ## API Token Authentication
 
 For enhanced security, use API tokens instead of passwords:
 
 1. Generate a token at https://screeps.com/a/#!/account/auth-tokens
-2. Connect using the token:
-   ```
-   screeps_connect with connectionName="main", token="your-api-token-here"
+2. Start the MCP server with the token:
+   ```bash
+   screeps-api-mcp --token your-api-token-here
    ```
 
 ## Error Handling
