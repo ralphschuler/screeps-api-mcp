@@ -68,10 +68,7 @@ export class ScreepsTools {
       }
       return api;
     })().catch(error => {
-      Logger.error(
-        'Failed to initialize Screeps connection:',
-        error
-      );
+      Logger.error('Failed to initialize Screeps connection:', error);
       throw error;
     });
 
@@ -107,7 +104,8 @@ export class ScreepsTools {
             },
             shard: {
               type: 'string',
-              description: 'Shard to execute the command on (optional, defaults to configured shard)',
+              description:
+                'Shard to execute the command on (optional, defaults to configured shard)',
             },
           },
           required: ['command'],
@@ -316,7 +314,9 @@ export class ScreepsTools {
     // Rate limiting check
     if (!this.rateLimiter.allowRequest(`tool:${name}`)) {
       return {
-        content: [{ type: 'text', text: 'Rate limit exceeded. Please wait before making more requests.' }],
+        content: [
+          { type: 'text', text: 'Rate limit exceeded. Please wait before making more requests.' },
+        ],
         isError: true,
       };
     }
@@ -660,7 +660,10 @@ export class ScreepsTools {
         content: [
           {
             type: 'text',
-            text: value !== null ? `Memory value at ${sanitizedPath}:\n${value}` : `Memory path ${sanitizedPath} is empty.`,
+            text:
+              value !== null
+                ? `Memory value at ${sanitizedPath}:\n${value}`
+                : `Memory path ${sanitizedPath} is empty.`,
           },
         ],
       };

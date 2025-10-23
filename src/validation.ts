@@ -85,7 +85,7 @@ export class ErrorHandler {
   static formatGenericError(error: unknown, context?: string): CallToolResult {
     const errorMessage = error instanceof Error ? error.message : String(error);
     const contextText = context ? ` (${context})` : '';
-    
+
     // Log error for debugging (only in development)
     if (process.env.NODE_ENV !== 'production') {
       console.error(`Error${contextText}:`, error);
@@ -147,17 +147,17 @@ export class RateLimiter {
     }
 
     const requestTimes = this.requests.get(identifier)!;
-    
+
     // Remove old requests outside the window
     const validRequests = requestTimes.filter(time => time > windowStart);
-    
+
     if (validRequests.length >= this.maxRequests) {
       return false;
     }
 
     validRequests.push(now);
     this.requests.set(identifier, validRequests);
-    
+
     return true;
   }
 

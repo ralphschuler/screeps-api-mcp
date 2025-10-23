@@ -178,7 +178,7 @@ export class ScreepsAPI {
 
   async getConsoleHistory(limit: number = 20): Promise<ConsoleMessage[]> {
     const response = await this.apiRequest(`/api/user/console?limit=${limit}`);
-    
+
     interface ConsoleHistoryResponse {
       messages?: Array<{
         line?: string;
@@ -188,7 +188,7 @@ export class ScreepsAPI {
         type?: string;
       }>;
     }
-    
+
     const messages = (response as ConsoleHistoryResponse).messages || [];
 
     return messages.map(msg => ({
@@ -336,7 +336,10 @@ export class ScreepsAPI {
     if (Array.isArray(parsedMessage) && parsedMessage.length > 1) {
       const messageData = parsedMessage[1] as SocketMessage;
       if (messageData && messageData.messages) {
-        this.processConsoleMessages(messageData.messages, messageData.shard || this.consoleShard || this.config.shard);
+        this.processConsoleMessages(
+          messageData.messages,
+          messageData.shard || this.consoleShard || this.config.shard
+        );
       }
     }
   }
@@ -357,7 +360,7 @@ export class ScreepsAPI {
       results?: string[];
       errors?: string[];
       highlight?: string[];
-    }, 
+    },
     shard: string
   ): void {
     const pushMessage = (line: string, type: ConsoleMessage['type']) => {
@@ -390,7 +393,9 @@ export class ScreepsAPI {
     }
   }
 
-  private determineMessageType(message: { type?: string }): 'log' | 'result' | 'error' | 'highlight' {
+  private determineMessageType(message: {
+    type?: string;
+  }): 'log' | 'result' | 'error' | 'highlight' {
     if (message.type === 'result') {
       return 'result';
     }

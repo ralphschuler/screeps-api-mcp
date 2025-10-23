@@ -23,7 +23,7 @@ const packageJson = require('../package.json') as {
 
 const packageName = packageJson.name;
 const packageVersion = packageJson.version;
-const cliName = packageJson.bin ? Object.keys(packageJson.bin)[0] ?? packageName : packageName;
+const cliName = packageJson.bin ? (Object.keys(packageJson.bin)[0] ?? packageName) : packageName;
 
 class ScreepsMCPServer {
   private server: Server;
@@ -33,7 +33,7 @@ class ScreepsMCPServer {
     // Configure logging based on environment
     const envSettings = ConfigManager.getEnvironmentSettings();
     Logger.configure(envSettings.logLevel, envSettings.enableDetailedErrors);
-    
+
     // Log sanitized configuration for debugging
     Logger.debug('Server configuration:', ConfigManager.sanitizeForLogging(connectionConfig));
 
@@ -127,7 +127,9 @@ function parseCliArgs(): ConnectionConfig {
     .option('--secure', 'Use HTTPS/WSS (default: true)', true)
     .option('--no-secure', 'Use HTTP/WS (not recommended for production)')
     .option('--shard <shard>', 'Default shard', 'shard0')
-    .addHelpText('after', `
+    .addHelpText(
+      'after',
+      `
 Environment Variables:
   SCREEPS_TOKEN        Screeps API token (most secure option)
   SCREEPS_USERNAME     Screeps username
@@ -140,7 +142,8 @@ Environment Variables:
 
 Security Note:
   API tokens are recommended over username/password for better security.
-  Generate tokens at: https://screeps.com/a/#!/account/auth-tokens`)
+  Generate tokens at: https://screeps.com/a/#!/account/auth-tokens`
+    )
     .parse();
 
   const options = program.opts();
@@ -176,7 +179,7 @@ process.on('unhandledRejection', (reason, _promise) => {
 });
 
 // Handle uncaught exceptions
-process.on('uncaughtException', (error) => {
+process.on('uncaughtException', error => {
   Logger.error('Uncaught Exception:', error);
   process.exit(1);
 });

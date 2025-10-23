@@ -11,7 +11,10 @@ export class ConfigManager {
     // Merge CLI options with environment variables (CLI takes precedence)
     const config: Partial<ConnectionConfig> = {
       host: cliOptions.host || process.env.SCREEPS_HOST || 'screeps.com',
-      secure: cliOptions.secure !== undefined ? cliOptions.secure : process.env.SCREEPS_SECURE !== 'false',
+      secure:
+        cliOptions.secure !== undefined
+          ? cliOptions.secure
+          : process.env.SCREEPS_SECURE !== 'false',
       username: cliOptions.username || process.env.SCREEPS_USERNAME,
       password: cliOptions.password || process.env.SCREEPS_PASSWORD,
       token: cliOptions.token || process.env.SCREEPS_TOKEN,
@@ -22,7 +25,9 @@ export class ConfigManager {
     try {
       return ConnectionConfigSchema.parse(config);
     } catch (error) {
-      throw new Error(`Invalid configuration: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(
+        `Invalid configuration: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   }
 
@@ -36,7 +41,7 @@ export class ConfigManager {
     if (!hasToken && !hasUsernamePassword) {
       throw new Error(
         'Authentication required: Must provide either --token or both --username and --password ' +
-        '(or use environment variables SCREEPS_TOKEN, SCREEPS_USERNAME, SCREEPS_PASSWORD)'
+          '(or use environment variables SCREEPS_TOKEN, SCREEPS_USERNAME, SCREEPS_PASSWORD)'
       );
     }
   }
