@@ -11,6 +11,18 @@ import {
 import { ScreepsTools } from './tools.js';
 import { Command } from 'commander';
 import { ConnectionConfig } from './types.js';
+import { createRequire } from 'module';
+
+const require = createRequire(import.meta.url);
+const packageJson = require('../package.json') as {
+  name: string;
+  version: string;
+  bin?: Record<string, string>;
+};
+
+const packageName = packageJson.name;
+const packageVersion = packageJson.version;
+const cliName = packageJson.bin ? Object.keys(packageJson.bin)[0] ?? packageName : packageName;
 
 class ScreepsMCPServer {
   private server: Server;
@@ -19,8 +31,8 @@ class ScreepsMCPServer {
   constructor(connectionConfig: ConnectionConfig) {
     this.server = new Server(
       {
-        name: 'screeps-api-mcp',
-        version: '1.0.0',
+        name: packageName,
+        version: packageVersion,
       },
       {
         capabilities: {
@@ -78,9 +90,9 @@ function parseCliArgs(): ConnectionConfig {
   const program = new Command();
 
   program
-    .name('screeps-api-mcp')
+    .name(cliName)
     .description('Screeps API MCP Server')
-    .version('1.0.0')
+    .version(packageVersion)
     .option('--token <token>', 'Screeps API token')
     .option('--username <username>', 'Screeps username')
     .option('--password <password>', 'Screeps password')
