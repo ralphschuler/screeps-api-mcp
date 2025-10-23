@@ -1,6 +1,21 @@
 import { Tool, CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { ScreepsAPI } from './screeps-api.js';
-import { ConnectionConfig, ConnectionConfigSchema, ConsoleMessage } from './types.js';
+import {
+  ConnectionConfig,
+  ConnectionConfigSchema,
+  ConsoleMessage,
+  ConsoleCommandArgsSchema,
+  ConsoleHistoryArgsSchema,
+  ConsoleStreamStartArgsSchema,
+  ConsoleStreamReadArgsSchema,
+  RoomNameArgsSchema,
+  MemoryPathArgsSchema,
+  MemorySetArgsSchema,
+  MemorySegmentArgsSchema,
+  MemorySegmentSetArgsSchema,
+} from './types.js';
+import { validateInput, InputSanitizer, ErrorHandler, RateLimiter } from './validation.js';
+import { Logger } from './config.js';
 
 function formatConsoleMessages(messages: ConsoleMessage[]): string {
   if (messages.length === 0) {
@@ -21,12 +36,25 @@ interface ScreepsToolsOptions {
   skipAuthentication?: boolean;
 }
 
+/**
+ * ScreepsTools provides MCP tool implementations for Screeps API interactions.
+ * Implements security best practices including input validation, rate limiting,
+ * and proper error handling.
+ */
 export class ScreepsTools {
   private readonly config: ConnectionConfig;
   private readonly apiReady: Promise<ScreepsAPI>;
+  private readonly rateLimiter: RateLimiter;
+  private readonly cleanupInterval?: ReturnType<typeof setInterval>;
 
+  /**
+   * Creates a new ScreepsTools instance with enhanced security and validation.
+   * @param connectionConfig - Screeps server connection configuration
+   * @param options - Optional configuration for testing and customization
+   */
   constructor(connectionConfig: ConnectionConfig, options: ScreepsToolsOptions = {}) {
     this.config = ConnectionConfigSchema.parse(connectionConfig);
+    this.rateLimiter = new RateLimiter(60000, 100); // 100 requests per minute
 
     const factory = options.apiFactory ?? (cfg => new ScreepsAPI(cfg));
     const api = factory(this.config);
@@ -36,18 +64,24 @@ export class ScreepsTools {
     this.apiReady = (async () => {
       if (shouldAuthenticate) {
         await api.authenticate();
-        console.error(`Successfully connected to Screeps server at ${host}`);
+        Logger.info(`Successfully connected to Screeps server at ${host}`);
       }
       return api;
     })().catch(error => {
-      console.error(
-        'Failed to initialize Screeps connection:',
-        error instanceof Error ? error.message : String(error)
-      );
+      Logger.error('Failed to initialize Screeps connection:', error);
       throw error;
     });
+
+    // Clean up rate limiter periodically (only in production, not in tests)
+    if (process.env.NODE_ENV !== 'test') {
+      this.cleanupInterval = setInterval(() => this.rateLimiter.cleanup(), 300000); // Every 5 minutes
+    }
   }
 
+  /**
+   * Returns the list of available MCP tools with proper schema definitions.
+   * Each tool includes comprehensive input validation and security constraints.
+   */
   getTools(): Tool[] {
     return [
       {
@@ -70,7 +104,8 @@ export class ScreepsTools {
             },
             shard: {
               type: 'string',
-              description: 'Shard to execute the command on (optional, defaults to configured shard)',
+              description:
+                'Shard to execute the command on (optional, defaults to configured shard)',
             },
           },
           required: ['command'],
@@ -269,7 +304,23 @@ export class ScreepsTools {
     ];
   }
 
-  async handleToolCall(name: string, args: any): Promise<CallToolResult> {
+  /**
+   * Handles tool execution with rate limiting, input validation, and error handling.
+   * @param name - The name of the tool to execute
+   * @param args - The arguments passed to the tool
+   * @returns Promise resolving to the tool execution result
+   */
+  async handleToolCall(name: string, args: unknown): Promise<CallToolResult> {
+    // Rate limiting check
+    if (!this.rateLimiter.allowRequest(`tool:${name}`)) {
+      return {
+        content: [
+          { type: 'text', text: 'Rate limit exceeded. Please wait before making more requests.' },
+        ],
+        isError: true,
+      };
+    }
+
     try {
       switch (name) {
         case 'screeps_connection_status':
@@ -309,336 +360,433 @@ export class ScreepsTools {
           };
       }
     } catch (error) {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `Error: ${error instanceof Error ? error.message : String(error)}`,
-          },
-        ],
-        isError: true,
-      };
+      return ErrorHandler.formatGenericError(error, `handling tool ${name}`);
     }
   }
 
   private async handleConnectionStatus(): Promise<CallToolResult> {
-    const api = await this.getApi();
-    const summary = api.getConnectionSummary('default');
+    try {
+      const api = await this.getApi();
+      const summary = api.getConnectionSummary('default');
 
-    const lines = [
-      `Connection name: ${summary.name}`,
-      `Host: ${summary.secure ? 'https' : 'http'}://${summary.host}`,
-      `Default shard: ${summary.shard}`,
-      `Authenticated user: ${summary.authenticatedUser ?? 'unknown'}`,
-      `Token available: ${summary.hasToken ? 'yes' : 'no'}`,
-    ];
+      const lines = [
+        `Connection name: ${summary.name}`,
+        `Host: ${summary.secure ? 'https' : 'http'}://${summary.host}`,
+        `Default shard: ${summary.shard}`,
+        `Authenticated user: ${summary.authenticatedUser ?? 'unknown'}`,
+        `Token available: ${summary.hasToken ? 'yes' : 'no'}`,
+      ];
 
-    if (summary.stream) {
-      lines.push(
-        'Console stream:',
-        `  active: ${summary.stream.isActive ? 'yes' : 'no'}`,
-        `  shard: ${summary.stream.shard}`,
-        `  buffered messages: ${summary.stream.buffered}`
-      );
-    } else {
-      lines.push('Console stream: not started');
-    }
+      if (summary.stream) {
+        lines.push(
+          'Console stream:',
+          `  active: ${summary.stream.isActive ? 'yes' : 'no'}`,
+          `  shard: ${summary.stream.shard}`,
+          `  buffered messages: ${summary.stream.buffered}`
+        );
+      } else {
+        lines.push('Console stream: not started');
+      }
 
-    return {
-      content: [
-        {
-          type: 'text',
-          text: lines.join('\n'),
-        },
-      ],
-    };
-  }
-
-  private async handleConsoleCommand(args: any): Promise<CallToolResult> {
-    if (!args.command || typeof args.command !== 'string') {
-      throw new Error('Command parameter is required');
-    }
-
-    const api = await this.getApi();
-    const result = await api.executeConsoleCommand(args.command, args.shard);
-
-    return {
-      content: [
-        {
-          type: 'text',
-          text: `Console command executed successfully. Timestamp: ${result.timestamp}`,
-        },
-      ],
-    };
-  }
-
-  private async handleConsoleHistory(args: any): Promise<CallToolResult> {
-    const limit = typeof args?.limit === 'number' ? Math.min(Math.max(1, args.limit), 200) : 20;
-    const api = await this.getApi();
-
-    const messages = await api.getConsoleHistory(limit);
-
-    const formattedMessages = messages
-      .map(message => {
-        const timestamp = new Date(message.timestamp || Date.now()).toISOString();
-        const type = message.type ? message.type.toUpperCase() : 'LOG';
-        return `[${message.shard}] ${timestamp} (${type}) ${message.line}`;
-      })
-      .join('\n');
-
-    return {
-      content: [
-        {
-          type: 'text',
-          text: `Console History (last ${messages.length} messages):\n\n${formattedMessages}`,
-        },
-      ],
-    };
-  }
-
-  private async handleConsoleStreamStart(args: any): Promise<CallToolResult> {
-    const requestedBufferSize = typeof args?.bufferSize === 'number' ? args.bufferSize : undefined;
-    const sanitizedBufferSize =
-      typeof requestedBufferSize === 'number'
-        ? Math.min(Math.max(requestedBufferSize, 10), 5000)
-        : undefined;
-
-    const api = await this.getApi();
-    await api.startConsoleStream(args?.shard, sanitizedBufferSize);
-
-    const state = api.getConsoleStreamState();
-    const effectiveBufferSize = sanitizedBufferSize ?? 500;
-
-    return {
-      content: [
-        {
-          type: 'text',
-          text: `Console stream started on shard ${state.shard}. Buffering up to ${effectiveBufferSize} messages.`,
-        },
-      ],
-    };
-  }
-
-  private async handleConsoleStreamRead(args: any): Promise<CallToolResult> {
-    const api = await this.getApi();
-    const limit = typeof args?.limit === 'number' ? Math.min(Math.max(args.limit, 1), 500) : 50;
-    const since = typeof args?.since === 'number' ? args.since : undefined;
-
-    const messages = api.getBufferedConsoleMessages(limit, since);
-
-    return {
-      content: [
-        {
-          type: 'text',
-          text: formatConsoleMessages(messages),
-        },
-      ],
-    };
-  }
-
-  private async handleConsoleStreamStop(): Promise<CallToolResult> {
-    const api = await this.getApi();
-    api.stopConsoleStream();
-
-    return {
-      content: [
-        {
-          type: 'text',
-          text: 'Console stream stopped.',
-        },
-      ],
-    };
-  }
-
-  private async handleUserInfo(): Promise<CallToolResult> {
-    const api = await this.getApi();
-    const userInfo = await api.getUserInfo();
-
-    return {
-      content: [
-        {
-          type: 'text',
-          text: `User Info:\n${JSON.stringify(userInfo, null, 2)}`,
-        },
-      ],
-    };
-  }
-
-  private async handleShardInfo(): Promise<CallToolResult> {
-    const api = await this.getApi();
-    const shards = await api.getShardInfo();
-
-    if (shards.length === 0) {
       return {
         content: [
           {
             type: 'text',
-            text: 'No shard information available from the server.',
+            text: lines.join('\n'),
           },
         ],
       };
+    } catch (error) {
+      return ErrorHandler.formatApiError(error as Error, 'getting connection status');
     }
-
-    const formatted = shards
-      .map(shard => {
-        const parts = [`- ${shard.name}`];
-        if (typeof shard.tick === 'number') {
-          parts.push(`tick ${shard.tick}`);
-        }
-        if (typeof shard.players === 'number') {
-          parts.push(`${shard.players} players`);
-        }
-        if (typeof shard.uptime === 'number') {
-          parts.push(`uptime ${shard.uptime}`);
-        }
-        return parts.join(' — ');
-      })
-      .join('\n');
-
-    return {
-      content: [
-        {
-          type: 'text',
-          text: `Shards:\n${formatted}`,
-        },
-      ],
-    };
   }
 
-  private async handleRoomObjects(args: any): Promise<CallToolResult> {
-    if (!args?.roomName || typeof args.roomName !== 'string') {
-      throw new Error('roomName parameter is required');
+  private async handleConsoleCommand(args: unknown): Promise<CallToolResult> {
+    const validation = validateInput(ConsoleCommandArgsSchema, args, 'console command');
+    if (!validation.success) {
+      return validation.error;
     }
 
-    const api = await this.getApi();
-    const objects = await api.getRoomObjects(args.roomName);
+    const { command, shard } = validation.data;
+    const sanitizedCommand = InputSanitizer.sanitizeConsoleCommand(command);
 
-    return {
-      content: [
-        {
-          type: 'text',
-          text: `Room Objects in ${args.roomName} (${objects.length} objects):\n${JSON.stringify(objects, null, 2)}`,
-        },
-      ],
-    };
+    try {
+      const api = await this.getApi();
+      const result = await api.executeConsoleCommand(sanitizedCommand, shard);
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Console command executed successfully. Timestamp: ${result.timestamp}`,
+          },
+        ],
+      };
+    } catch (error) {
+      return ErrorHandler.formatApiError(error as Error, 'executing console command');
+    }
   }
 
-  private async handleRoomTerrain(args: any): Promise<CallToolResult> {
-    if (!args?.roomName || typeof args.roomName !== 'string') {
-      throw new Error('roomName parameter is required');
+  private async handleConsoleHistory(args: unknown): Promise<CallToolResult> {
+    const validation = validateInput(ConsoleHistoryArgsSchema, args, 'console history');
+    if (!validation.success) {
+      return validation.error;
     }
 
-    const api = await this.getApi();
-    const terrain = await api.getRoomTerrain(args.roomName);
+    const { limit } = validation.data;
 
-    return {
-      content: [
-        {
-          type: 'text',
-          text: `Room Terrain for ${args.roomName}:\n${JSON.stringify(terrain, null, 2)}`,
-        },
-      ],
-    };
+    try {
+      const api = await this.getApi();
+      const messages = await api.getConsoleHistory(limit);
+
+      const formattedMessages = messages
+        .map(message => {
+          const timestamp = new Date(message.timestamp || Date.now()).toISOString();
+          const type = message.type ? message.type.toUpperCase() : 'LOG';
+          return `[${message.shard}] ${timestamp} (${type}) ${message.line}`;
+        })
+        .join('\n');
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Console History (last ${messages.length} messages):\n\n${formattedMessages}`,
+          },
+        ],
+      };
+    } catch (error) {
+      return ErrorHandler.formatApiError(error as Error, 'fetching console history');
+    }
   }
 
-  private async handleMemoryGet(args: any): Promise<CallToolResult> {
-    if (!args?.path || typeof args.path !== 'string') {
-      throw new Error('path parameter is required');
+  private async handleConsoleStreamStart(args: unknown): Promise<CallToolResult> {
+    const validation = validateInput(ConsoleStreamStartArgsSchema, args, 'console stream start');
+    if (!validation.success) {
+      return validation.error;
     }
 
-    const api = await this.getApi();
-    const value = await api.getMemory(args.path);
+    const { shard, bufferSize } = validation.data;
 
-    return {
-      content: [
-        {
-          type: 'text',
-          text: value !== null ? `Memory value at ${args.path}:\n${value}` : `Memory path ${args.path} is empty.`,
-        },
-      ],
-    };
+    try {
+      const api = await this.getApi();
+      await api.startConsoleStream(shard, bufferSize);
+
+      const state = api.getConsoleStreamState();
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Console stream started on shard ${state.shard}. Buffering up to ${bufferSize} messages.`,
+          },
+        ],
+      };
+    } catch (error) {
+      return ErrorHandler.formatApiError(error as Error, 'starting console stream');
+    }
   }
 
-  private async handleMemorySet(args: any): Promise<CallToolResult> {
-    if (!args?.path || typeof args.path !== 'string') {
-      throw new Error('path parameter is required');
-    }
-    if (args?.value === undefined || typeof args.value !== 'string') {
-      throw new Error('value parameter is required');
+  private async handleConsoleStreamRead(args: unknown): Promise<CallToolResult> {
+    const validation = validateInput(ConsoleStreamReadArgsSchema, args, 'console stream read');
+    if (!validation.success) {
+      return validation.error;
     }
 
-    const api = await this.getApi();
-    await api.setMemory(args.path, args.value);
+    const { limit, since } = validation.data;
 
-    return {
-      content: [
-        {
-          type: 'text',
-          text: `Memory path ${args.path} updated successfully.`,
-        },
-      ],
-    };
+    try {
+      const api = await this.getApi();
+      const messages = api.getBufferedConsoleMessages(limit, since);
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: formatConsoleMessages(messages),
+          },
+        ],
+      };
+    } catch (error) {
+      return ErrorHandler.formatApiError(error as Error, 'reading console stream');
+    }
   }
 
-  private async handleMemoryDelete(args: any): Promise<CallToolResult> {
-    if (!args?.path || typeof args.path !== 'string') {
-      throw new Error('path parameter is required');
+  private async handleConsoleStreamStop(): Promise<CallToolResult> {
+    try {
+      const api = await this.getApi();
+      api.stopConsoleStream();
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: 'Console stream stopped.',
+          },
+        ],
+      };
+    } catch (error) {
+      return ErrorHandler.formatApiError(error as Error, 'stopping console stream');
     }
-
-    const api = await this.getApi();
-    await api.deleteMemory(args.path);
-
-    return {
-      content: [
-        {
-          type: 'text',
-          text: `Memory path ${args.path} deleted successfully.`,
-        },
-      ],
-    };
   }
 
-  private async handleMemorySegmentGet(args: any): Promise<CallToolResult> {
-    if (typeof args?.segment !== 'number') {
-      throw new Error('segment parameter is required');
+  private async handleUserInfo(): Promise<CallToolResult> {
+    try {
+      const api = await this.getApi();
+      const userInfo = await api.getUserInfo();
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `User Info:\n${JSON.stringify(userInfo, null, 2)}`,
+          },
+        ],
+      };
+    } catch (error) {
+      return ErrorHandler.formatApiError(error as Error, 'fetching user info');
     }
-
-    const api = await this.getApi();
-    const segment = await api.getMemorySegment(args.segment);
-
-    return {
-      content: [
-        {
-          type: 'text',
-          text: `Memory Segment ${args.segment}:\n${segment.data}`,
-        },
-      ],
-    };
   }
 
-  private async handleMemorySegmentSet(args: any): Promise<CallToolResult> {
-    if (typeof args?.segment !== 'number') {
-      throw new Error('segment parameter is required');
+  private async handleShardInfo(): Promise<CallToolResult> {
+    try {
+      const api = await this.getApi();
+      const shards = await api.getShardInfo();
+
+      if (shards.length === 0) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'No shard information available from the server.',
+            },
+          ],
+        };
+      }
+
+      const formatted = shards
+        .map(shard => {
+          const parts = [`- ${shard.name}`];
+          if (typeof shard.tick === 'number') {
+            parts.push(`tick ${shard.tick}`);
+          }
+          if (typeof shard.players === 'number') {
+            parts.push(`${shard.players} players`);
+          }
+          if (typeof shard.uptime === 'number') {
+            parts.push(`uptime ${shard.uptime}`);
+          }
+          return parts.join(' — ');
+        })
+        .join('\n');
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Shards:\n${formatted}`,
+          },
+        ],
+      };
+    } catch (error) {
+      return ErrorHandler.formatApiError(error as Error, 'fetching shard info');
     }
-    if (args?.data === undefined || typeof args.data !== 'string') {
-      throw new Error('data parameter is required');
+  }
+
+  private async handleRoomObjects(args: unknown): Promise<CallToolResult> {
+    const validation = validateInput(RoomNameArgsSchema, args, 'room objects');
+    if (!validation.success) {
+      return validation.error;
     }
 
-    const api = await this.getApi();
-    await api.setMemorySegment(args.segment, args.data);
+    const { roomName } = validation.data;
 
-    return {
-      content: [
-        {
-          type: 'text',
-          text: `Memory segment ${args.segment} updated successfully.`,
-        },
-      ],
-    };
+    try {
+      const api = await this.getApi();
+      const objects = await api.getRoomObjects(roomName);
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Room Objects in ${roomName} (${objects.length} objects):\n${JSON.stringify(objects, null, 2)}`,
+          },
+        ],
+      };
+    } catch (error) {
+      return ErrorHandler.formatApiError(error as Error, 'fetching room objects');
+    }
+  }
+
+  private async handleRoomTerrain(args: unknown): Promise<CallToolResult> {
+    const validation = validateInput(RoomNameArgsSchema, args, 'room terrain');
+    if (!validation.success) {
+      return validation.error;
+    }
+
+    const { roomName } = validation.data;
+
+    try {
+      const api = await this.getApi();
+      const terrain = await api.getRoomTerrain(roomName);
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Room Terrain for ${roomName}:\n${JSON.stringify(terrain, null, 2)}`,
+          },
+        ],
+      };
+    } catch (error) {
+      return ErrorHandler.formatApiError(error as Error, 'fetching room terrain');
+    }
+  }
+
+  private async handleMemoryGet(args: unknown): Promise<CallToolResult> {
+    const validation = validateInput(MemoryPathArgsSchema, args, 'memory get');
+    if (!validation.success) {
+      return validation.error;
+    }
+
+    const { path } = validation.data;
+    const sanitizedPath = InputSanitizer.sanitizeMemoryPath(path);
+
+    try {
+      const api = await this.getApi();
+      const value = await api.getMemory(sanitizedPath);
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text:
+              value !== null
+                ? `Memory value at ${sanitizedPath}:\n${value}`
+                : `Memory path ${sanitizedPath} is empty.`,
+          },
+        ],
+      };
+    } catch (error) {
+      return ErrorHandler.formatApiError(error as Error, 'getting memory value');
+    }
+  }
+
+  private async handleMemorySet(args: unknown): Promise<CallToolResult> {
+    const validation = validateInput(MemorySetArgsSchema, args, 'memory set');
+    if (!validation.success) {
+      return validation.error;
+    }
+
+    const { path, value } = validation.data;
+    const sanitizedPath = InputSanitizer.sanitizeMemoryPath(path);
+    const sanitizedValue = InputSanitizer.sanitizeString(value);
+
+    try {
+      const api = await this.getApi();
+      await api.setMemory(sanitizedPath, sanitizedValue);
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Memory path ${sanitizedPath} updated successfully.`,
+          },
+        ],
+      };
+    } catch (error) {
+      return ErrorHandler.formatApiError(error as Error, 'setting memory value');
+    }
+  }
+
+  private async handleMemoryDelete(args: unknown): Promise<CallToolResult> {
+    const validation = validateInput(MemoryPathArgsSchema, args, 'memory delete');
+    if (!validation.success) {
+      return validation.error;
+    }
+
+    const { path } = validation.data;
+    const sanitizedPath = InputSanitizer.sanitizeMemoryPath(path);
+
+    try {
+      const api = await this.getApi();
+      await api.deleteMemory(sanitizedPath);
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Memory path ${sanitizedPath} deleted successfully.`,
+          },
+        ],
+      };
+    } catch (error) {
+      return ErrorHandler.formatApiError(error as Error, 'deleting memory value');
+    }
+  }
+
+  private async handleMemorySegmentGet(args: unknown): Promise<CallToolResult> {
+    const validation = validateInput(MemorySegmentArgsSchema, args, 'memory segment get');
+    if (!validation.success) {
+      return validation.error;
+    }
+
+    const { segment } = validation.data;
+
+    try {
+      const api = await this.getApi();
+      const segmentData = await api.getMemorySegment(segment);
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Memory Segment ${segment}:\n${segmentData.data}`,
+          },
+        ],
+      };
+    } catch (error) {
+      return ErrorHandler.formatApiError(error as Error, 'getting memory segment');
+    }
+  }
+
+  private async handleMemorySegmentSet(args: unknown): Promise<CallToolResult> {
+    const validation = validateInput(MemorySegmentSetArgsSchema, args, 'memory segment set');
+    if (!validation.success) {
+      return validation.error;
+    }
+
+    const { segment, data } = validation.data;
+    const sanitizedData = InputSanitizer.sanitizeString(data);
+
+    try {
+      const api = await this.getApi();
+      await api.setMemorySegment(segment, sanitizedData);
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Memory segment ${segment} updated successfully.`,
+          },
+        ],
+      };
+    } catch (error) {
+      return ErrorHandler.formatApiError(error as Error, 'setting memory segment');
+    }
   }
 
   async waitUntilReady(): Promise<void> {
     await this.apiReady;
+  }
+
+  /**
+   * Clean up resources
+   */
+  cleanup(): void {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+    }
   }
 
   private async getApi(): Promise<ScreepsAPI> {

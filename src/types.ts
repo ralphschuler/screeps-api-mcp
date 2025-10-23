@@ -83,3 +83,55 @@ export interface ConnectionSummary {
   hasToken: boolean;
   stream?: ConsoleStreamState;
 }
+
+// Tool parameter schemas for input validation
+export const ConsoleCommandArgsSchema = z.object({
+  command: z.string().min(1).max(10000),
+  shard: z.string().optional(),
+});
+
+export const ConsoleHistoryArgsSchema = z.object({
+  limit: z.number().int().min(1).max(200).optional().default(20),
+});
+
+export const ConsoleStreamStartArgsSchema = z.object({
+  shard: z.string().optional(),
+  bufferSize: z.number().int().min(10).max(5000).optional().default(500),
+});
+
+export const ConsoleStreamReadArgsSchema = z.object({
+  limit: z.number().int().min(1).max(500).optional().default(50),
+  since: z.number().int().positive().optional(),
+});
+
+export const RoomNameArgsSchema = z.object({
+  roomName: z.string().regex(/^[EW]\d+[NS]\d+$/, 'Invalid room name format'),
+});
+
+export const MemoryPathArgsSchema = z.object({
+  path: z.string().min(1).max(500),
+});
+
+export const MemorySetArgsSchema = z.object({
+  path: z.string().min(1).max(500),
+  value: z.string().max(100000),
+});
+
+export const MemorySegmentArgsSchema = z.object({
+  segment: z.number().int().min(0).max(99),
+});
+
+export const MemorySegmentSetArgsSchema = z.object({
+  segment: z.number().int().min(0).max(99),
+  data: z.string().max(100000),
+});
+
+export type ConsoleCommandArgs = z.infer<typeof ConsoleCommandArgsSchema>;
+export type ConsoleHistoryArgs = z.infer<typeof ConsoleHistoryArgsSchema>;
+export type ConsoleStreamStartArgs = z.infer<typeof ConsoleStreamStartArgsSchema>;
+export type ConsoleStreamReadArgs = z.infer<typeof ConsoleStreamReadArgsSchema>;
+export type RoomNameArgs = z.infer<typeof RoomNameArgsSchema>;
+export type MemoryPathArgs = z.infer<typeof MemoryPathArgsSchema>;
+export type MemorySetArgs = z.infer<typeof MemorySetArgsSchema>;
+export type MemorySegmentArgs = z.infer<typeof MemorySegmentArgsSchema>;
+export type MemorySegmentSetArgs = z.infer<typeof MemorySegmentSetArgsSchema>;

@@ -1,16 +1,26 @@
 # Screeps API MCP Server
 
-A Model Context Protocol (MCP) server that provides tools for interacting with Screeps game servers. This server enables AI assistants and other MCP clients to connect to Screeps servers, execute console commands, retrieve game data, and manage memory segments.
+A Model Context Protocol (MCP) server that provides secure, validated tools for interacting with Screeps game servers. This server enables AI assistants and other MCP clients to connect to Screeps servers, execute console commands, retrieve game data, and manage memory segments with enhanced security and reliability.
 
 ## Features
 
-- **Authentication**: Connect to Screeps servers using username/password or API tokens
+### Core Functionality
+- **Authentication**: Connect to Screeps servers using username/password or API tokens (tokens recommended for security)
 - **Secure Connection Initialization**: Provide credentials once at startup to establish the single connection used by all tools
-- **Console Commands & History**: Execute JavaScript commands and retrieve recent console output
+- **Console Commands & History**: Execute JavaScript commands and retrieve recent console output with input sanitization
 - **Live Console Streaming**: Start, read, and stop a persistent websocket console stream with in-memory buffering
-- **Memory Access**: Read/write/delete arbitrary `Memory` paths and manage memory segments
+- **Memory Access**: Read/write/delete arbitrary `Memory` paths and manage memory segments with validation
 - **Room & Shard Data**: Access room objects, terrain information, and shard metadata
 - **User Information**: Get account details and statistics for the authenticated player
+
+### Security & Reliability (NEW)
+- **Input Validation**: Comprehensive Zod schema validation for all tool parameters
+- **Input Sanitization**: Protection against XSS, command injection, and path traversal attacks
+- **Rate Limiting**: Configurable rate limiting to prevent API abuse (100 requests/minute default)
+- **Error Handling**: Structured error responses with proper context and logging
+- **Type Safety**: Full TypeScript coverage with eliminated `any` types
+- **Configuration Management**: Environment-aware configuration with security best practices
+- **Logging**: Structured logging with configurable levels and environment-specific settings
 
 ## Installation (GitHub Packages)
 
@@ -108,13 +118,36 @@ Add to your MCP client configuration (e.g., Claude Desktop):
 
 ### Environment Variables
 
-The following environment variables are supported:
-- `SCREEPS_TOKEN` - Screeps API token
+#### Connection Settings
+- `SCREEPS_TOKEN` - Screeps API token (recommended for security)
 - `SCREEPS_USERNAME` - Screeps username  
 - `SCREEPS_PASSWORD` - Screeps password
 - `SCREEPS_HOST` - Server hostname (default: screeps.com)
 - `SCREEPS_SECURE` - Use HTTPS/WSS (default: true)
 - `SCREEPS_SHARD` - Default shard (default: shard0)
+
+#### Application Settings (NEW)
+- `NODE_ENV` - Environment mode: `development`, `test`, `production`
+- `LOG_LEVEL` - Logging level: `debug`, `info`, `warn`, `error` (default: info)
+- `ENABLE_METRICS` - Enable performance metrics collection (default: true in production)
+
+### Security Considerations
+
+#### API Token Authentication (Recommended)
+- Use API tokens instead of username/password for better security
+- Generate tokens at: https://screeps.com/a/#!/account/auth-tokens
+- Tokens can be scoped to specific permissions and easily revoked
+
+#### Input Validation & Sanitization
+- All inputs are validated against strict schemas before processing
+- Console commands are sanitized to prevent injection attacks
+- Memory paths are validated to prevent directory traversal
+- Room names must match valid Screeps format (E1S2, W1N1, etc.)
+
+#### Rate Limiting
+- Built-in rate limiting prevents API abuse (100 requests/minute default)
+- Per-tool rate limiting with sliding window algorithm
+- Automatic cleanup prevents memory leaks
 
 ### Available Tools
 
@@ -263,14 +296,53 @@ For enhanced security, use API tokens instead of passwords:
    screeps-api-mcp --token your-api-token-here
    ```
 
-## Error Handling
+## Security & Error Handling
 
-The server provides detailed error messages for:
-- Authentication failures
-- Invalid room names
-- Network connectivity issues
-- API rate limiting
-- Malformed requests
+### Enhanced Security Features
+
+The server implements comprehensive security measures following MCP best practices:
+
+#### Input Validation
+- **Schema Validation**: All tool parameters validated with Zod schemas
+- **Type Safety**: Full TypeScript coverage eliminates runtime type errors
+- **Constraint Enforcement**: Proper limits on string lengths, numeric ranges, and formats
+- **Room Name Validation**: Regex validation for Screeps room format (E1S2, W1N1, etc.)
+
+#### Input Sanitization  
+- **XSS Prevention**: HTML tags and dangerous JavaScript removed from inputs
+- **Command Injection Protection**: Dangerous patterns filtered from console commands
+- **Path Traversal Prevention**: Directory traversal attempts blocked in memory paths
+- **SQL Injection Protection**: Although not applicable here, string sanitization provides general protection
+
+#### Rate Limiting & DoS Protection
+- **Sliding Window Rate Limiting**: 100 requests per minute default limit
+- **Per-Tool Limiting**: Individual rate limits for different tool types
+- **Memory Management**: Automatic cleanup prevents memory leaks from rate limiter
+- **Graceful Degradation**: Clear error messages when limits exceeded
+
+#### Authentication Security
+- **Token-Based Auth**: API tokens recommended over username/password
+- **Credential Validation**: Comprehensive validation of authentication parameters
+- **Secure Connection**: HTTPS/WSS enforced by default
+- **Configuration Sanitization**: Sensitive data redacted from logs
+
+### Error Handling
+
+The server provides structured error responses with proper context:
+- **Authentication failures** with clear remediation steps
+- **Validation errors** with specific field-level feedback  
+- **Network connectivity issues** with connection status details
+- **API rate limiting** with retry guidance
+- **Malformed requests** with schema validation details
+- **Configuration errors** with environment variable guidance
+
+### Logging & Observability
+
+- **Structured Logging**: JSON-formatted logs with proper levels
+- **Environment-Aware**: Different log levels for development vs production
+- **Error Context**: Stack traces and request context in development mode
+- **Performance Monitoring**: Built-in metrics collection support
+- **Security Audit**: Request validation failures logged for monitoring
 
 ## Development
 
