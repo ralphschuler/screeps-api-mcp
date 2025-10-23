@@ -12,17 +12,32 @@ A Model Context Protocol (MCP) server that provides tools for interacting with S
 - **Room & Shard Data**: Access room objects, terrain information, and shard metadata
 - **User Information**: Get account details and statistics for the authenticated player
 
-## Installation
+## Installation (GitHub Packages)
+
+This project is published via [GitHub Packages](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-npm-registry), so npm must be configured to pull the `@ralfschuler` scope from `npm.pkg.github.com`. If you have not already, create (or update) your `~/.npmrc` with a Personal Access Token that has the `read:packages` scope:
 
 ```bash
-npm install -g screeps-api-mcp
+npm config set @ralfschuler:registry https://npm.pkg.github.com
+echo "//npm.pkg.github.com/:_authToken=${GITHUB_PAT}" >> ~/.npmrc
 ```
 
-Or run directly with npx:
+> **Note:** replace `GITHUB_PAT` with a GitHub Personal Access Token that includes the `read:packages` scope.
+
+After configuration, install the CLI globally to place the `screeps-api-mcp` executable on your path:
 
 ```bash
-npx screeps-api-mcp
+npm install -g @ralfschuler/screeps-api-mcp
 ```
+
+### Running with npx
+
+To execute the server without a global install, ensure the GitHub Packages registry configuration above is in place and then run:
+
+```bash
+npx @ralfschuler/screeps-api-mcp --token your-api-token-here
+```
+
+All of the CLI options shown below apply when running via `npx` as well.
 
 ## Usage
 
