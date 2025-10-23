@@ -3,6 +3,46 @@ import assert from 'node:assert';
 import { ScreepsAPI } from '../dist/screeps-api.js';
 import { ScreepsTools } from '../dist/tools.js';
 
+function createToolsInstance(config) {
+  const baseConfig = {
+    host: 'screeps.com',
+    secure: true,
+    shard: 'shard0',
+    token: 'test-token',
+  };
+
+  const finalConfig = { ...baseConfig, ...config };
+
+  return new ScreepsTools(finalConfig, {
+    skipAuthentication: true,
+    apiFactory: cfg => ({
+      getConnectionSummary: () => ({
+        name: 'default',
+        host: cfg.host,
+        secure: cfg.secure,
+        shard: cfg.shard,
+        authenticatedUser: 'tester',
+        hasToken: Boolean(cfg.token),
+      }),
+      executeConsoleCommand: async () => ({ ok: 1, timestamp: Date.now() }),
+      getConsoleHistory: async () => [],
+      startConsoleStream: async () => {},
+      getConsoleStreamState: () => ({ shard: cfg.shard, isActive: false, buffered: 0 }),
+      getBufferedConsoleMessages: () => [],
+      stopConsoleStream: () => {},
+      getUserInfo: async () => ({ _id: 'user1', username: 'tester' }),
+      getShardInfo: async () => [],
+      getRoomObjects: async () => [],
+      getRoomTerrain: async () => ({}),
+      getMemory: async () => null,
+      setMemory: async () => {},
+      deleteMemory: async () => {},
+      getMemorySegment: async segment => ({ segment, data: '' }),
+      setMemorySegment: async () => {},
+    }),
+  });
+}
+
 describe('Basic Module Tests', () => {
   describe('ScreepsAPI', () => {
     test('can be instantiated with config', () => {
@@ -53,9 +93,11 @@ describe('Basic Module Tests', () => {
   });
 
   describe('ScreepsTools', () => {
-    test('can be instantiated without config', () => {
-      const tools = new ScreepsTools();
-      assert.ok(tools);
+    test('throws when instantiated without config', () => {
+      assert.throws(() => {
+        // @ts-expect-error intentional invalid usage for runtime check
+        new ScreepsTools();
+      });
     });
 
     test('can be instantiated with config', () => {
@@ -66,19 +108,19 @@ describe('Basic Module Tests', () => {
         shard: 'shard0',
       };
 
-      const tools = new ScreepsTools(config);
+      const tools = createToolsInstance(config);
       assert.ok(tools);
     });
 
     test('has required methods', () => {
-      const tools = new ScreepsTools();
+      const tools = createToolsInstance();
 
       assert.strictEqual(typeof tools.getTools, 'function');
       assert.strictEqual(typeof tools.handleToolCall, 'function');
     });
 
     test('getTools returns consistent results', () => {
-      const tools = new ScreepsTools();
+      const tools = createToolsInstance();
 
       const tools1 = tools.getTools();
       const tools2 = tools.getTools();
@@ -130,7 +172,7 @@ describe('Basic Module Tests', () => {
         }, `Config ${index} should be valid`);
 
         assert.doesNotThrow(() => {
-          new ScreepsTools({ ...config, shard: 'shard0' });
+          createToolsInstance({ ...config, shard: 'shard0' });
         }, `Config ${index} should work with tools`);
       });
     });

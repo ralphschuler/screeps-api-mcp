@@ -22,6 +22,13 @@ export const ConsoleMessageSchema = z.object({
 
 export type ConsoleMessage = z.infer<typeof ConsoleMessageSchema>;
 
+// Console streaming buffer summary
+export interface ConsoleStreamState {
+  shard: string;
+  isActive: boolean;
+  buffered: number;
+}
+
 // Screeps API response types
 export const UserInfoSchema = z.object({
   _id: z.string(),
@@ -57,3 +64,22 @@ export const MemorySegmentSchema = z.object({
 });
 
 export type MemorySegment = z.infer<typeof MemorySegmentSchema>;
+
+export const ShardInfoSchema = z.object({
+  name: z.string(),
+  tick: z.number().optional(),
+  players: z.number().optional(),
+  uptime: z.number().optional(),
+});
+
+export type ShardInfo = z.infer<typeof ShardInfoSchema>;
+
+export interface ConnectionSummary {
+  name: string;
+  host: string;
+  secure: boolean;
+  shard: string;
+  authenticatedUser?: string;
+  hasToken: boolean;
+  stream?: ConsoleStreamState;
+}

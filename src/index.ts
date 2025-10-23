@@ -16,7 +16,7 @@ class ScreepsMCPServer {
   private server: Server;
   private tools: ScreepsTools;
 
-  constructor(connectionConfig?: ConnectionConfig) {
+  constructor(connectionConfig: ConnectionConfig) {
     this.server = new Server(
       {
         name: 'screeps-api-mcp',
@@ -66,6 +66,7 @@ class ScreepsMCPServer {
   }
 
   async start(): Promise<void> {
+    await this.tools.waitUntilReady();
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
     console.error('Screeps API MCP Server running on stdio');
@@ -73,7 +74,7 @@ class ScreepsMCPServer {
 }
 
 // Parse command line arguments
-function parseCliArgs(): ConnectionConfig | undefined {
+function parseCliArgs(): ConnectionConfig {
   const program = new Command();
 
   program
