@@ -1,9 +1,0 @@
-FROM node:20-alpine AS builder
-WORKDIR /app
-COPY package*.json ./
-COPY . .
-RUN npm ci --verbose
-RUN echo "=== Checking installation ==="
-RUN ls -la node_modules/.bin/ || echo "no .bin directory"
-RUN ls -la node_modules/typescript/ || echo "no typescript directory"
-RUN find node_modules -name "tsc" -type f || echo "no tsc file found"

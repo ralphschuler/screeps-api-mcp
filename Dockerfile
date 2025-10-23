@@ -11,10 +11,8 @@ COPY package*.json ./
 COPY . .
 
 # Install dependencies including dev dependencies for building
+# The prepare script will automatically run after npm ci and build the project
 RUN npm ci
-
-# Build the project (prepare script runs build automatically, but let's be explicit)
-RUN npm run build
 
 # Remove dev dependencies to reduce size (clean install without dev deps)
 RUN npm ci --omit=dev && npm cache clean --force
