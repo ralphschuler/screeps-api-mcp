@@ -7,16 +7,14 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies including dev dependencies for building
-RUN npm ci
-
-# Copy source code
+# Copy source code first (needed for prepare script)
 COPY . .
 
-# Build the project
-RUN npm run build
+# Install dependencies including dev dependencies for building
+# The prepare script will automatically run after npm ci and build the project
+RUN npm ci
 
-# Remove dev dependencies to reduce size
+# Remove dev dependencies to reduce size (clean install without dev deps)
 RUN npm ci --omit=dev && npm cache clean --force
 
 # Production stage
